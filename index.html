@@ -2404,17 +2404,21 @@
                             <i class="fas fa-clipboard-list text-primary me-2"></i> Modul Uraian Tugas Pegawai
                         </div>
                         <div class="d-flex flex-wrap align-items-center gap-2">
-                            <div class="input-group input-group-sm" style="max-width: 250px;">
+                            <div class="input-group input-group-sm" style="max-width: 270px;">
                                 <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
-                                <input type="text" id="searchUraian" class="form-control bg-light border-start-0" placeholder="Cari NIP / Nama..." onkeyup="window.renderUraian()">
+                                <input type="text" id="searchUraian" class="form-control bg-light border-start-0" placeholder="Cari NIP, Nama, atau Jabatan..." oninput="window.renderUraian()" onkeyup="window.renderUraian()">
                             </div>
                             <select id="filterUraianUnit" class="form-select form-select-sm" style="width: auto;" onchange="window.renderUraian()">
                                 <option value="">-- Semua Unit Tugas --</option>
-                                <option value="Puskesmas Kecamatan Kepulauan Seribu Selatan">Puskesmas Kecamatan Kepulauan Seribu Selatan</option>
-                                <option value="Puskesmas Pembantu Pulau Untung Jawa">Puskesmas Pembantu Pulau Untung Jawa</option>
-                                <option value="Puskesmas Pembantu Pulau Pari">Puskesmas Pembantu Pulau Pari</option>
-                                <option value="Puskesmas Pembantu Pulau Lancang">Puskesmas Pembantu Pulau Lancang</option>
-                                <option value="Puskesmas Pembantu Pulau Payung">Puskesmas Pembantu Pulau Payung</option>
+                                <option value="Puskesmas Kepulauan Seribu Selatan">Puskesmas Kepulauan Seribu Selatan</option>
+                                <option value="Pustu Pulau Kelapa">Pustu Pulau Kelapa</option>
+                                <option value="Pustu Pulau Harapan">Pustu Pulau Harapan</option>
+                                <option value="Pustu Pulau Panggang">Pustu Pulau Panggang</option>
+                                <option value="Pustu Pulau Pramuka">Pustu Pulau Pramuka</option>
+                                <option value="Pustu Pulau Untung Jawa">Pustu Pulau Untung Jawa</option>
+                                <option value="Pustu Pulau Pari">Pustu Pulau Pari</option>
+                                <option value="Pustu Pulau Lancang">Pustu Pulau Lancang</option>
+                                <option value="Pustu Pulau Payung">Pustu Pulau Payung</option>
                             </select>
                             <select id="filterUraianStatus" class="form-select form-select-sm" style="width: auto;" onchange="window.renderUraian()">
                                 <option value="ALL">-- Semua Status --</option>
@@ -2945,7 +2949,7 @@
                             <div class="col-md-5 col-12">
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                                    <input type="text" id="searchDokumen" class="form-control form-control-sm border-start-0" placeholder="Cari NIP, Nama Pegawai, atau Jabatan..." onkeyup="window.renderDokumen()">
+                                    <input type="text" id="searchDokumen" class="form-control form-control-sm border-start-0" placeholder="Cari NIP, Nama Pegawai, atau Jabatan..." oninput="window.renderDokumen()" onkeyup="window.renderDokumen()">
                                 </div>
                             </div>
                             <div class="col-md-4 col-12">
@@ -2956,6 +2960,10 @@
                                     <option value="Pustu Pulau Harapan">Pustu Pulau Harapan</option>
                                     <option value="Pustu Pulau Panggang">Pustu Pulau Panggang</option>
                                     <option value="Pustu Pulau Pramuka">Pustu Pulau Pramuka</option>
+                                    <option value="Pustu Pulau Untung Jawa">Pustu Pulau Untung Jawa</option>
+                                    <option value="Pustu Pulau Pari">Pustu Pulau Pari</option>
+                                    <option value="Pustu Pulau Lancang">Pustu Pulau Lancang</option>
+                                    <option value="Pustu Pulau Payung">Pustu Pulau Payung</option>
                                 </select>
                             </div>
                             <div class="col-md-3 col-12">
@@ -9848,10 +9856,11 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             p.tmt = getVal('tmt', 'TMT', 'tmt_pegawai', 'tmt_cpns');
             p.tmt_pangkat = getVal('tmt_pangkat', 'TMT Pangkat', 'tmt_gol');
             p.tmt_jabatan = getVal('tmt_jabatan', 'TMT Jabatan');
-            p.pendidikan = getVal('pendidikan', 'Pendidikan', 'jenjang_pendidikan', 'tingkat_pendidikan', 'PENDIDIKAN');
-            p.jurusan = getVal('jurusan', 'Jurusan', 'program_studi', 'prodi');
-            p.nama_sekolah = getVal('nama_sekolah', 'Nama Sekolah', 'universitas', 'kampus');
-            p.tahun_lulus = getVal('tahun_lulus', 'Tahun Lulus', 'thn_lulus');
+            p.pendidikan = getVal('pendidikan', 'Pendidikan', 'jenjang_pendidikan', 'tingkat_pendidikan', 'jenjang', 'pendidikan_terakhir', 'PENDIDIKAN', 'JENJANG');
+            p.jurusan = getVal('jurusan', 'Jurusan', 'program_studi', 'prodi', 'PRODI', 'JURUSAN', 'PROGRAM_STUDI');
+            p.nama_sekolah = getVal('nama_sekolah', 'Nama Sekolah', 'universitas', 'kampus', 'institusi', 'univ', 'sekolah', 'NAMA_SEKOLAH', 'UNIVERSITAS');
+            p.tahun_lulus = getVal('tahun_lulus', 'Tahun Lulus', 'thn_lulus', 'thn', 'tgl_lulus', 'TAHUN_LULUS');
+            p.no_ijazah = getVal('no_ijazah', 'No Ijazah', 'nomor_ijazah', 'ijazah_no', 'NO_IJAZAH');
             p.str = getVal('str', 'STR', 'no_str', 'NO_STR');
             p.aktif_str = getVal('aktif_str', 'Aktif STR', 'masa_berlaku_str', 'exp_str');
             p.sip = getVal('sip', 'SIP', 'no_sip', 'NO_SIP');
@@ -10249,11 +10258,35 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             $('#v_tmt').text(p.tmt || '-');
             $('#v_kategori').text(p.kategori || '-');
 
-            // Data Pendidikan
-            $('#v_pendidikan').text(p.pendidikan || '-');
-            $('#v_jurusan').text(p.jurusan || p.program_studi || p.prodi || '-');
-            $('#v_nama_sekolah').text(p.nama_sekolah || p.universitas || p.institusi || '-');
-            $('#v_tahun_lulus').text(p.tahun_lulus || p.thn_lulus || '-');
+            // Data Pendidikan & Kualifikasi (supports flat attributes & structured riwayat_pendidikan)
+            let riwayatPend = p.pendidikan_history || p.riwayat_pendidikan || [];
+            if (typeof riwayatPend === 'string') {
+                try { riwayatPend = JSON.parse(riwayatPend); } catch(e){ riwayatPend = []; }
+            }
+            if (!Array.isArray(riwayatPend) || riwayatPend.length === 0) {
+                if (p.pendidikan || p.jenjang || p.jenjang_pendidikan || p.pendidikan_terakhir || p.jurusan || p.prodi || p.nama_sekolah || p.univ || p.tahun_lulus) {
+                    riwayatPend = [{
+                        jenjang: p.pendidikan || p.jenjang || p.jenjang_pendidikan || p.pendidikan_terakhir || '-',
+                        nama_sekolah: p.nama_sekolah || p.univ || p.universitas || p.institusi || p.sekolah || '-',
+                        jurusan: p.jurusan || p.program_studi || p.prodi || '-',
+                        tahun_lulus: p.tahun_lulus || p.thn_lulus || p.thn || '-',
+                        no_ijazah: p.no_ijazah || '-'
+                    }];
+                } else {
+                    riwayatPend = [];
+                }
+            }
+
+            const primaryEdu = (Array.isArray(riwayatPend) && riwayatPend.length > 0) ? riwayatPend[0] : null;
+            const displayJenjang = p.pendidikan || p.jenjang || p.jenjang_pendidikan || p.pendidikan_terakhir || (primaryEdu ? (primaryEdu.jenjang || primaryEdu.tingkat) : '') || '-';
+            const displayProdi = p.jurusan || p.program_studi || p.prodi || (primaryEdu ? (primaryEdu.jurusan || primaryEdu.prodi) : '') || '-';
+            const displayUniv = p.nama_sekolah || p.universitas || p.institusi || p.univ || p.sekolah || (primaryEdu ? (primaryEdu.institusi || primaryEdu.sekolah || primaryEdu.nama_sekolah || primaryEdu.universitas) : '') || '-';
+            const displayTahunLulus = p.tahun_lulus || p.thn_lulus || p.thn || (primaryEdu ? (primaryEdu.tahun_lulus || primaryEdu.tgl || primaryEdu.thn) : '') || '-';
+
+            $('#v_pendidikan').text(displayJenjang);
+            $('#v_jurusan').text(displayProdi);
+            $('#v_nama_sekolah').text(displayUniv);
+            $('#v_tahun_lulus').text(displayTahunLulus);
             let gelarStr = '';
             if (p.gelar_depan && p.gelar_depan.trim() !== '') gelarStr += p.gelar_depan.trim();
             if (p.gelar_belakang && p.gelar_belakang.trim() !== '') {
@@ -20374,23 +20407,35 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             targetPegawaiList.forEach((p) => {
                 let idx = dataPegawai.indexOf(p);
                 if (idx === -1) idx = 0;
-                const nama = p.nama || 'Tanpa Nama';
-                const nip = p.nip || '-';
-                const ukpd = p.ukpd || p.unit_tugas || 'Puskesmas Seribu Selatan';
-                const jabatan = p.jabatan || p.jabatan_kepmenpan || p.jabatan_pergub || 'Staf Administrasi';
+                const nama = (p.nama || 'Tanpa Nama').toString();
+                const nip = (p.nip || p.NIP || '-').toString();
+                const nik = (p.nik || p.NIK || '').toString();
+                const nrk = (p.nrk || p.NRK || '').toString();
+                const ukpd = (p.tempat_tugas || p.nama_ukpd || p.ukpd || p.unit_tugas || 'Puskesmas Kepulauan Seribu Selatan').toString();
+                const jabatan = (p.jabatan || p.jabatan_kepmenpan || p.jabatan_pergub || 'Staf').toString();
                 const foto = p.foto || 'assets/default-avatar.png';
 
                 // Check Uraian Tugas
                 const ut = p.uraian_tugas || null;
-                const isLengkap = ut && ut.ikhtisar && ut.tugas_pokok && ut.status === 'Lengkap';
+                const isLengkap = ut && ut.ikhtisar && ut.tugas_pokok && (ut.status === 'Lengkap' || ut.status === 'Aktif');
 
                 if (isLengkap) totalLengkap++;
                 else totalDraft++;
 
-                // Search Filter
-                const matchSearch = !searchQuery || nama.toLowerCase().includes(searchQuery) || nip.toLowerCase().includes(searchQuery) || jabatan.toLowerCase().includes(searchQuery);
-                // Unit Filter
-                const matchUnit = !unitFilter || ukpd.toLowerCase() === unitFilter.toLowerCase();
+                // Search Filter (checks Nama, NIP, NIK, NRK, Jabatan, Unit Tugas)
+                const matchSearch = !searchQuery || 
+                    nama.toLowerCase().includes(searchQuery) || 
+                    nip.toLowerCase().includes(searchQuery) || 
+                    nik.toLowerCase().includes(searchQuery) || 
+                    nrk.toLowerCase().includes(searchQuery) || 
+                    jabatan.toLowerCase().includes(searchQuery) || 
+                    ukpd.toLowerCase().includes(searchQuery);
+
+                // Unit Filter (flexible matching)
+                const matchUnit = !unitFilter || 
+                    ukpd.toLowerCase().includes(unitFilter.toLowerCase()) || 
+                    unitFilter.toLowerCase().includes(ukpd.toLowerCase());
+
                 // Status Filter
                 const matchStatus = statusFilter === 'ALL' || (statusFilter === 'Lengkap' && isLengkap) || (statusFilter === 'Draft' && !isLengkap);
 
@@ -20667,6 +20712,10 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 }
             };
 
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.nama || 'P')}&background=1e1b4b&color=fff&bold=true&size=128`;
+            const fotoSrc = (p.foto && p.foto.trim() !== '') ? p.foto : defaultAvatar;
+            const unitKerjaDisplay = p.tempat_tugas || p.nama_ukpd || p.ukpd || p.unit_tugas || 'Puskesmas Kepulauan Seribu Selatan';
+
             const printHtml = `
                 <!DOCTYPE html>
                 <html lang="id">
@@ -20688,12 +20737,17 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         .kop-addr { font-size: 8.5pt; color: #1e293b; line-height: 1.3; margin-top: 3px; }
                         .garis-ganda-kedinasan { border-bottom: 3px double #000; margin-top: 6px; margin-bottom: 18px; width: 100%; }
 
-                        .doc-title { text-align: center; margin: 15px 0 20px 0; }
+                        .doc-title { text-align: center; margin: 12px 0 16px 0; }
                         .doc-title h3 { font-size: 13pt; font-weight: bold; text-transform: uppercase; text-decoration: underline; margin: 0; letter-spacing: 0.5px; }
                         .doc-title p { font-size: 9pt; margin: 3px 0 0 0; color: #475569; }
 
-                        table.tbl-info { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-                        table.tbl-info td { padding: 4px 6px; vertical-align: top; font-size: 9.5pt; }
+                        .pegawai-box { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; background: #f8fafc; }
+                        .foto-wrapper { flex-shrink: 0; text-align: center; }
+                        .foto-pegawai-doc { width: 78px; height: 100px; object-fit: cover; border-radius: 4px; border: 1.5px solid #64748b; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                        .foto-label { font-size: 7pt; color: #64748b; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+                        table.tbl-info { width: 100%; border-collapse: collapse; }
+                        table.tbl-info td { padding: 3px 6px; vertical-align: top; font-size: 9.5pt; line-height: 1.3; }
 
                         .sec-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; background: #f8fafc; }
                         .sec-title { font-weight: bold; font-size: 10pt; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -20705,6 +20759,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         @media print {
                             body { padding: 0; }
                             .no-print { display: none; }
+                            .pegawai-box { background: #fff !important; border: 1px solid #94a3b8; }
                             .sec-box { background: #fff !important; border: 1px solid #94a3b8; }
                         }
                     </style>
@@ -20741,13 +20796,19 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         <p>Nomor: 800/UT/${p.nip || '0000'}/PKSS/${new Date().getFullYear()}</p>
                     </div>
 
-                    <table class="tbl-info">
-                        <tr><td width="22%"><strong>Nama Pegawai</strong></td><td width="3%">:</td><td width="75%"><strong>${p.nama || '-'}</strong></td></tr>
-                        <tr><td>NIP / NRK</td><td>:</td><td>${p.nip || '-'} / ${p.nrk || '-'}</td></tr>
-                        <tr><td>Pangkat / Golongan</td><td>:</td><td>${p.pangkat_gol || p.golongan || '-'}</td></tr>
-                        <tr><td>Jabatan Resmi</td><td>:</td><td>${p.jabatan || p.jabatan_kepmenpan || p.jabatan_pergub || '-'}</td></tr>
-                        <tr><td>Unit Kerja / UKPD</td><td>:</td><td>${p.ukpd || p.unit_tugas || 'Puskesmas Kepulauan Seribu Selatan'}</td></tr>
-                    </table>
+                    <div class="pegawai-box">
+                        <table class="tbl-info">
+                            <tr><td width="28%"><strong>Nama Pegawai</strong></td><td width="3%">:</td><td width="69%"><strong>${p.nama || '-'}</strong></td></tr>
+                            <tr><td>NIP / NRK</td><td>:</td><td>${p.nip || '-'} / ${p.nrk || '-'}</td></tr>
+                            <tr><td>Pangkat / Golongan</td><td>:</td><td>${p.pangkat_gol || p.golongan || '-'}</td></tr>
+                            <tr><td>Jabatan Resmi</td><td>:</td><td>${p.jabatan || p.jabatan_kepmenpan || p.jabatan_pergub || '-'}</td></tr>
+                            <tr><td>Unit Kerja / UKPD</td><td>:</td><td>${unitKerjaDisplay}</td></tr>
+                        </table>
+                        <div class="foto-wrapper">
+                            <img src="${fotoSrc}" class="foto-pegawai-doc" alt="Foto ${p.nama || 'Pegawai'}" onerror="this.src='${defaultAvatar}'">
+                            <div class="foto-label">Foto Pegawai</div>
+                        </div>
+                    </div>
 
                     <div class="sec-box">
                         <div class="sec-title">I. IKHTISAR JABATAN</div>
@@ -22306,10 +22367,12 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             targetPegawaiList.forEach((p) => {
                 let idx = dataPegawai.indexOf(p);
                 if (idx === -1) idx = 0;
-                const nama = p.nama || 'Tanpa Nama';
-                const nip = p.nip || '-';
-                const ukpd = p.ukpd || p.unit_tugas || 'Puskesmas Seribu Selatan';
-                const jabatan = p.jabatan || p.jabatan_kepmenpan || p.jabatan_pergub || 'Staf Administrasi';
+                const nama = (p.nama || 'Tanpa Nama').toString();
+                const nip = (p.nip || p.NIP || '-').toString();
+                const nik = (p.nik || p.NIK || '').toString();
+                const nrk = (p.nrk || p.NRK || '').toString();
+                const ukpd = (p.tempat_tugas || p.nama_ukpd || p.ukpd || p.unit_tugas || 'Puskesmas Kepulauan Seribu Selatan').toString();
+                const jabatan = (p.jabatan || p.jabatan_kepmenpan || p.jabatan_pergub || 'Staf Administrasi').toString();
                 const foto = p.foto || 'assets/default-avatar.png';
 
                 const stats = window.getDokumenCounts(p);
@@ -22318,8 +22381,20 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
 
                 totalDriveFiles += (stats.uploaded + stats.extraCount);
 
-                const matchSearch = !searchQuery || nama.toLowerCase().includes(searchQuery) || nip.toLowerCase().includes(searchQuery) || jabatan.toLowerCase().includes(searchQuery);
-                const matchUnit = !unitFilter || ukpd.toLowerCase() === unitFilter.toLowerCase();
+                // Search Filter (checks Nama, NIP, NIK, NRK, Jabatan, Unit Tugas)
+                const matchSearch = !searchQuery || 
+                    nama.toLowerCase().includes(searchQuery) || 
+                    nip.toLowerCase().includes(searchQuery) || 
+                    nik.toLowerCase().includes(searchQuery) || 
+                    nrk.toLowerCase().includes(searchQuery) || 
+                    jabatan.toLowerCase().includes(searchQuery) || 
+                    ukpd.toLowerCase().includes(searchQuery);
+
+                // Unit Filter (flexible matching)
+                const matchUnit = !unitFilter || 
+                    ukpd.toLowerCase().includes(unitFilter.toLowerCase()) || 
+                    unitFilter.toLowerCase().includes(ukpd.toLowerCase());
+
                 const matchStatus = statusFilter === 'ALL' || (statusFilter === 'Lengkap' && stats.isLengkap) || (statusFilter === 'Draft' && !stats.isLengkap);
 
                 if (matchSearch && matchUnit && matchStatus) {
