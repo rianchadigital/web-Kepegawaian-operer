@@ -11,38 +11,46 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isValidString(val, minLen, maxLen) {
-      return val is string && val.size() >= minLen && val.size() <= maxLen;
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+
-);
-    }
-
-    // Pegawai collection
+    // Pegawai collection (identitas pribadi, operasional, foto profil)
     match /pegawai/{pegawaiId} {
-      allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     // Disiplin collection
     match /disiplin/{disiplinId} {
-      allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     // Usulan collection
     match /usulan/{usulanId} {
-      allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     // Jadwal Diklat collection
     match /jadwal_diklat/{jadwalId} {
-      allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if true;
+    }
+
+    // Gap Kompetensi collection
+    match /gap_kompetensi/{gapId} {
+      allow read, write: if true;
+    }
+
+    // Master Data collection
+    match /master_data/{docId} {
+      allow read, write: if true;
+    }
+
+    // Pengguna / Auth collection
+    match /pengguna/{userId} {
+      allow read, write: if true;
+    }
+
+    // Connection test collection
+    match /test/{docId} {
+      allow read, write: if true;
     }
   }
 }
+
 
