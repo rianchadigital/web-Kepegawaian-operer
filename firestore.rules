@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+
+);
+    }
+
+    // Pegawai collection
+    match /pegawai/{pegawaiId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Disiplin collection
+    match /disiplin/{disiplinId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Usulan collection
+    match /usulan/{usulanId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Jadwal Diklat collection
+    match /jadwal_diklat/{jadwalId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+  }
+}
+

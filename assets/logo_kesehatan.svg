@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 190" width="100%" height="100%">
+  <defs>
+    <linearGradient id="kemkesGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00a88f"/>
+      <stop offset="50%" stop-color="#00897b"/>
+      <stop offset="100%" stop-color="#00695c"/>
+    </linearGradient>
+    <linearGradient id="kemkesCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00bcd4"/>
+      <stop offset="100%" stop-color="#0288d1"/>
+    </linearGradient>
+    <linearGradient id="goldStar" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Outer Circular / Shield Halo -->
+  <circle cx="80" cy="95" r="72" fill="#f0fdfa" stroke="#00a88f" stroke-width="3" filter="url(#glow)"/>
+  <circle cx="80" cy="95" r="66" fill="#ffffff" stroke="#99f6e4" stroke-width="1.5"/>
+
+  <!-- Modern Kemenkes Heart / Dynamic Swooshes -->
+  <!-- Upper Left Swoosh (Teal / Green) -->
+  <path d="M 40,82 C 40,55 60,42 78,54 C 83,58 87,63 87,63 C 87,63 76,72 68,78 C 55,87 40,82 40,82 Z" fill="url(#kemkesGreen)"/>
+  
+  <!-- Upper Right Swoosh (Cyan / Blue) -->
+  <path d="M 120,82 C 120,55 100,42 82,54 C 77,58 73,63 73,63 C 73,63 84,72 92,78 C 105,87 120,82 120,82 Z" fill="url(#kemkesCyan)"/>
+
+  <!-- Central Flowing Heart / Healthy Life Figure -->
+  <path d="M 80,68 C 65,48 38,62 42,92 C 45,114 74,136 80,142 C 86,136 115,114 118,92 C 122,62 95,48 80,68 Z" 
+        fill="none" stroke="url(#kemkesGreen)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Central Medical Cross / Plus Symbol -->
+  <rect x="73" y="80" width="14" height="30" rx="3" fill="#00a88f"/>
+  <rect x="65" y="88" width="30" height="14" rx="3" fill="#00a88f"/>
+  <circle cx="80" cy="95" r="4" fill="#ffffff"/>
+
+  <!-- Lower Banner Ribbon "KESEHATAN" -->
+  <path d="M 32,148 L 128,148 L 122,168 L 80,163 L 38,168 Z" fill="#00695c" stroke="#004d40" stroke-width="1"/>
+  <text x="80" y="162" font-family="'Arial Black', Impact, sans-serif" font-weight="900" font-size="9" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">KESEHATAN</text>
+</svg>

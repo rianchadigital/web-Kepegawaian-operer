@@ -1,0 +1,46 @@
+/* ============================================================
+   ASSETS STYLE CUSTOM - SIMPEG DIGITAL PUSKESMAS KEP. SERIBU SELATAN
+   Domain Target: https://tatausahaseribu.my.id
+   ============================================================ */
+
+/* Primary Theme Variables */
+:root {
+  --pksu-primary: #4F46E5;
+  --pksu-secondary: #0EA5E9;
+  --pksu-success: #10B981;
+  --pksu-warning: #F59E0B;
+  --pksu-danger: #EF4444;
+  --pksu-dark: #1E293B;
+  --pksu-light: #F8FAFC;
+}
+
+/* Custom Avatar Styling */
+.avatar-img-preview {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.pksu-badge-status {
+  padding: 0.35em 0.75em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 9999px;
+}
+
+/* Print Optimization for ID Card & Reports */
+@media print {
+  .no-print, nav, .sidebar, button, .modal-footer {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

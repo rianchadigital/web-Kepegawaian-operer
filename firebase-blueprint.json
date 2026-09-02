@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "Pegawai": {
+      "title": "Pegawai",
+      "description": "Data Pegawai SIMPEG",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nama": { "type": "string" },
+        "nip": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "unit_tugas": { "type": "string" },
+        "no_hp": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["nama", "nip"]
+    },
+    "Disiplin": {
+      "title": "Disiplin Pegawai",
+      "description": "Catatan Hukuman Disiplin Pegawai",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pegawai_nip": { "type": "string" },
+        "nama": { "type": "string" },
+        "tingkat": { "type": "string" },
+        "jenis_hukdis": { "type": "string" },
+        "nosk": { "type": "string" },
+        "tmt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["pegawai_nip", "jenis_hukdis"]
+    },
+    "Usulan": {
+      "title": "Usulan Layanan Kepegawaian",
+      "description": "Usulan Tunjangan Keluarga, Kenaikan Pangkat, Kenaikan Jenjang",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jenis": { "type": "string" },
+        "pegawai_nip": { "type": "string" },
+        "nama": { "type": "string" },
+        "unit_tugas": { "type": "string" },
+        "status": { "type": "string" },
+        "tgl_usul": { "type": "string" },
+        "catatan_verif": { "type": "string" }
+      },
+      "required": ["jenis", "pegawai_nip", "status"]
+    },
+    "JadwalDiklat": {
+      "title": "Jadwal Diklat Pegawai",
+      "description": "Perencanaan Jadwal Diklat dan Pelatihan Masa Depan Pegawai",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nama": { "type": "string" },
+        "kategori": { "type": "string" },
+        "penyelenggara": { "type": "string" },
+        "lokasi": { "type": "string" },
+        "tgl_mulai": { "type": "string" },
+        "tgl_selesai": { "type": "string" },
+        "jp": { "type": "number" },
+        "status": { "type": "string" },
+        "catatan": { "type": "string" }
+      },
+      "required": ["nama", "tgl_mulai"]
+    }
+  },
+  "firestore": {
+    "/pegawai/{pegawaiId}": {
+      "schema": { "$ref": "#/entities/Pegawai" },
+      "description": "Koleksi data pegawai SIMPEG"
+    },
+    "/disiplin/{disiplinId}": {
+      "schema": { "$ref": "#/entities/Disiplin" },
+      "description": "Koleksi catatan disiplin pegawai"
+    },
+    "/usulan/{usulanId}": {
+      "schema": { "$ref": "#/entities/Usulan" },
+      "description": "Koleksi usulan layanan kepegawaian"
+    },
+    "/jadwal_diklat/{jadwalId}": {
+      "schema": { "$ref": "#/entities/JadwalDiklat" },
+      "description": "Koleksi perencanaan jadwal diklat pegawai"
+    }
+  }
+}
