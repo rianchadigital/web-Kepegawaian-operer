@@ -266,6 +266,13 @@ const INITIAL_PEGAWAI = [
 // Persistent File Storage Path for Data
 const DATA_FILE = path.join(process.cwd(), 'data_pegawai_db.json');
 const PAYROLL_FILE = path.join(process.cwd(), 'data_payroll_db.json');
+const DIKLAT_FILE = path.join(process.cwd(), 'data_diklat_db.json');
+const USULAN_FILE = path.join(process.cwd(), 'data_usulan_db.json');
+const GAP_FILE = path.join(process.cwd(), 'data_gap_db.json');
+const DISIPLIN_FILE = path.join(process.cwd(), 'data_disiplin_db.json');
+const PENGGUNA_FILE = path.join(process.cwd(), 'data_pengguna_db.json');
+const MASTER_FILE = path.join(process.cwd(), 'data_master_db.json');
+const CONFIG_FILE = path.join(process.cwd(), 'data_config_db.json');
 
 const INITIAL_PAYROLL = [
   {
@@ -390,11 +397,44 @@ const INITIAL_PAYROLL = [
   }
 ];
 
+function isPegawaiRecord(item: any): boolean {
+  if (!item || typeof item !== 'object') return false;
+  // Exclude diklat records that might have leaked into pegawai
+  if (item.penyelenggara && item.tgl_selesai && !item.nip && !item.nik && !item.jabatan) return false;
+  return Boolean(item.nip || item.nik || item.nama || item.jabatan);
+}
+
+function loadJsonFile(filePath: string, fallback: any) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error("Error reading file " + filePath + ":", e);
+  }
+  return fallback;
+}
+
+function saveJsonFile(filePath: string, data: any) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error("Error saving file " + filePath + ":", e);
+  }
+}
+
 function loadPegawaiDb() {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const filtered = parsed.filter(isPegawaiRecord);
+        if (filtered.length > 0) {
+          return filtered;
+        }
+      }
     }
   } catch (e) {
     console.error("Error reading data file:", e);
@@ -404,7 +444,8 @@ function loadPegawaiDb() {
 
 function savePegawaiDb(data: any[]) {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    const validPegawai = Array.isArray(data) ? data.filter(isPegawaiRecord) : [];
+    fs.writeFileSync(DATA_FILE, JSON.stringify(validPegawai, null, 2), 'utf-8');
   } catch (e) {
     console.error("Error saving data file:", e);
   }
@@ -432,6 +473,13 @@ function savePayrollDb(data: any[]) {
 
 let pegawaiDb = loadPegawaiDb();
 let payrollDb = loadPayrollDb();
+let diklatDb = loadJsonFile(DIKLAT_FILE, []);
+let usulanDb = loadJsonFile(USULAN_FILE, []);
+let gapDb = loadJsonFile(GAP_FILE, []);
+let disiplinDb = loadJsonFile(DISIPLIN_FILE, {});
+let penggunaDb = loadJsonFile(PENGGUNA_FILE, []);
+let masterDb = loadJsonFile(MASTER_FILE, {});
+let configDb = loadJsonFile(CONFIG_FILE, { gas_webapp_url: '', instansi: 'Puskesmas Kepulauan Seribu Selatan' });
 
 // Lazy Gemini Client setup
 let genAIClient: GoogleGenAI | null = null;
@@ -554,12 +602,33 @@ const handleApiGet = (req: express.Request, res: express.Response) => {
     return res.json(pegawaiDb);
   } else if (action === 'getGajiData' || action === 'getPayrollData') {
     return res.json(payrollDb);
+  } else if (action === 'getDiklatData') {
+    return res.json(diklatDb);
+  } else if (action === 'getUsulanData') {
+    return res.json(usulanDb);
+  } else if (action === 'getGapData') {
+    return res.json(gapDb);
+  } else if (action === 'getDisiplinData') {
+    return res.json(disiplinDb);
+  } else if (action === 'getPenggunaData') {
+    return res.json(penggunaDb);
+  } else if (action === 'getMasterData') {
+    return res.json(masterDb);
+  } else if (action === 'getAppConfig') {
+    return res.json({ success: true, data: configDb });
   } else if (action === 'getAllAppModules' || action === 'getAllData') {
     return res.json({
       success: true,
       data: {
         pegawai: pegawaiDb,
-        gaji: payrollDb
+        gaji: payrollDb,
+        diklat: diklatDb,
+        usulan: usulanDb,
+        gap: gapDb,
+        disiplin: disiplinDb,
+        pengguna: penggunaDb,
+        master: masterDb,
+        config: configDb
       }
     });
   }
@@ -574,8 +643,35 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
     return res.json(pegawaiDb);
   } else if (action === 'getGajiData' || action === 'getPayrollData') {
     return res.json(payrollDb);
+  } else if (action === 'getDiklatData') {
+    return res.json(diklatDb);
+  } else if (action === 'getUsulanData') {
+    return res.json(usulanDb);
+  } else if (action === 'getGapData') {
+    return res.json(gapDb);
+  } else if (action === 'getDisiplinData') {
+    return res.json(disiplinDb);
+  } else if (action === 'getPenggunaData') {
+    return res.json(penggunaDb);
+  } else if (action === 'getMasterData') {
+    return res.json(masterDb);
+  } else if (action === 'getAppConfig') {
+    return res.json({ success: true, data: configDb });
   } else if (action === 'getAllAppModules' || action === 'getAllData') {
-    return res.json({ success: true, data: { pegawai: pegawaiDb, gaji: payrollDb } });
+    return res.json({
+      success: true,
+      data: {
+        pegawai: pegawaiDb,
+        gaji: payrollDb,
+        diklat: diklatDb,
+        usulan: usulanDb,
+        gap: gapDb,
+        disiplin: disiplinDb,
+        pengguna: penggunaDb,
+        master: masterDb,
+        config: configDb
+      }
+    });
   } else if (action === 'saveGajiData' || action === 'savePayrollData') {
     if (Array.isArray(data)) {
       payrollDb = data;
@@ -650,19 +746,105 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
     });
     savePayrollDb(payrollDb);
     return res.json({ success: true, message: "Data gaji berhasil dihapus." });
-  } else if (action === 'saveAllAppModules' || action === 'saveAllData' || action === 'savePegawaiData' || action === 'savePenggunaData' || action === 'saveUsulanData' || action === 'saveDisiplinData' || action === 'saveGapData' || action === 'saveDiklatData' || action === 'saveGajiData' || action === 'saveMasterData' || action === 'savePengaturanData') {
-    if (data && data.pegawai && Array.isArray(data.pegawai)) {
-      pegawaiDb = data.pegawai;
-      savePegawaiDb(pegawaiDb);
-    } else if (Array.isArray(data)) {
-      pegawaiDb = data;
-      savePegawaiDb(pegawaiDb);
+  } else if (action === 'saveAllAppModules') {
+    if (data && typeof data === 'object') {
+      if (data.pegawai && Array.isArray(data.pegawai) && data.pegawai.length > 0) {
+        const valid = data.pegawai.filter(isPegawaiRecord);
+        if (valid.length > 0) {
+          pegawaiDb = valid;
+          savePegawaiDb(pegawaiDb);
+        }
+      }
+      if (data.gaji && Array.isArray(data.gaji)) {
+        payrollDb = data.gaji;
+        savePayrollDb(payrollDb);
+      }
+      if (data.diklat && Array.isArray(data.diklat)) {
+        diklatDb = data.diklat;
+        saveJsonFile(DIKLAT_FILE, diklatDb);
+      }
+      if (data.usulan && Array.isArray(data.usulan)) {
+        usulanDb = data.usulan;
+        saveJsonFile(USULAN_FILE, usulanDb);
+      }
+      if (data.gap && Array.isArray(data.gap)) {
+        gapDb = data.gap;
+        saveJsonFile(GAP_FILE, gapDb);
+      }
+      if (data.disiplin) {
+        disiplinDb = data.disiplin;
+        saveJsonFile(DISIPLIN_FILE, disiplinDb);
+      }
+      if (data.pengguna && Array.isArray(data.pengguna)) {
+        penggunaDb = data.pengguna;
+        saveJsonFile(PENGGUNA_FILE, penggunaDb);
+      }
+      if (data.master) {
+        masterDb = data.master;
+        saveJsonFile(MASTER_FILE, masterDb);
+      }
+      if (data.config) {
+        configDb = { ...configDb, ...data.config };
+        saveJsonFile(CONFIG_FILE, configDb);
+      }
     }
-    if (data && data.gaji && Array.isArray(data.gaji)) {
-      payrollDb = data.gaji;
-      savePayrollDb(payrollDb);
+    return res.json({ success: true, message: "Seluruh data modul aplikasi berhasil tersimpan di server database!" });
+  } else if (action === 'saveAllData' || action === 'savePegawaiData') {
+    const list = Array.isArray(data) ? data : (data?.pegawai || []);
+    if (Array.isArray(list) && list.length > 0) {
+      const filtered = list.filter(isPegawaiRecord);
+      if (filtered.length > 0) {
+        pegawaiDb = filtered;
+        savePegawaiDb(pegawaiDb);
+        return res.json({ success: true, message: `Berhasil menyimpan ${pegawaiDb.length} data pegawai ke database server!`, total: pegawaiDb.length });
+      }
     }
-    return res.json({ success: true, message: "Data modul berhasil tersimpan!" });
+    return res.json({ success: false, message: "Format data pegawai tidak valid." });
+  } else if (action === 'saveDiklatData') {
+    if (Array.isArray(data)) {
+      diklatDb = data;
+      saveJsonFile(DIKLAT_FILE, diklatDb);
+      return res.json({ success: true, message: "Data jadwal diklat berhasil tersimpan!", count: diklatDb.length });
+    }
+    return res.json({ success: false, message: "Format data diklat tidak valid." });
+  } else if (action === 'saveUsulanData') {
+    if (Array.isArray(data)) {
+      usulanDb = data;
+      saveJsonFile(USULAN_FILE, usulanDb);
+      return res.json({ success: true, message: "Data usulan kepegawaian berhasil tersimpan!", count: usulanDb.length });
+    }
+    return res.json({ success: false, message: "Format data usulan tidak valid." });
+  } else if (action === 'saveGapData') {
+    if (Array.isArray(data)) {
+      gapDb = data;
+      saveJsonFile(GAP_FILE, gapDb);
+      return res.json({ success: true, message: "Data gap kompetensi berhasil tersimpan!", count: gapDb.length });
+    }
+    return res.json({ success: false, message: "Format data gap kompetensi tidak valid." });
+  } else if (action === 'saveDisiplinData') {
+    disiplinDb = data || {};
+    saveJsonFile(DISIPLIN_FILE, disiplinDb);
+    return res.json({ success: true, message: "Data disiplin berhasil tersimpan!" });
+  } else if (action === 'savePenggunaData') {
+    if (Array.isArray(data)) {
+      penggunaDb = data;
+      saveJsonFile(PENGGUNA_FILE, penggunaDb);
+      return res.json({ success: true, message: "Data pengguna hak akses tersimpan!", count: penggunaDb.length });
+    }
+    return res.json({ success: false, message: "Format data pengguna tidak valid." });
+  } else if (action === 'saveMasterData') {
+    masterDb = data || {};
+    saveJsonFile(MASTER_FILE, masterDb);
+    return res.json({ success: true, message: "Data master jabatan berhasil tersimpan!" });
+  } else if (action === 'saveAppConfig' || action === 'saveGasUrl' || action === 'savePengaturanData') {
+    const newCfg = (typeof data === 'string') ? { gas_webapp_url: data } : (data || {});
+    configDb = {
+      ...configDb,
+      ...newCfg,
+      gas_webapp_url: newCfg.gas_webapp_url !== undefined ? newCfg.gas_webapp_url : (newCfg.gasUrl !== undefined ? newCfg.gasUrl : (configDb.gas_webapp_url || ''))
+    };
+    saveJsonFile(CONFIG_FILE, configDb);
+    return res.json({ success: true, message: "Konfigurasi terpusat tersimpan di server!", config: configDb });
   } else if (action === 'login') {
     const { username, password } = data || {};
     const rawUsername = (username || '').toString().trim();

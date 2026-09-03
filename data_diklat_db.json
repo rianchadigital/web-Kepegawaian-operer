@@ -1,0 +1,112 @@
+[
+  {
+    "id": "JDW-2026-001",
+    "nama": "Pelatihan Penanganan Kegawatdaruratan Medis Pulau & BTCLS",
+    "kategori": "Teknis Medis",
+    "penyelenggara": "Bapelkes Kemenkes RI & HIPGABI",
+    "lokasi": "Auditorium Puskesmas Kepulauan Seribu Selatan",
+    "tgl_mulai": "2026-08-12",
+    "tgl_selesai": "2026-08-15",
+    "jp": 30,
+    "status": "Terkonfirmasi",
+    "catatan": "Peserta wajib membawa pakaian dinas lapangan & modul pelatihan. Menginap di Mess Puskesmas.",
+    "peserta": [
+      {
+        "nip": "199004122020011005",
+        "nama": "dr. Budi Santoso, Sp.PD",
+        "jabatan": "Dokter Spesialis"
+      },
+      {
+        "nip": "198805152015031002",
+        "nama": "Ahmad Subagja, S.Kep, Ners",
+        "jabatan": "Perawat Ahli Pertama"
+      },
+      {
+        "nip": "199408202022032008",
+        "nama": "Siti Aminah, A.Md.Kep",
+        "jabatan": "Perawat Mahir"
+      }
+    ]
+  },
+  {
+    "id": "JDW-2026-002",
+    "nama": "Workshop Keselamatan Pasien (Patient Safety) & Manajemen K3",
+    "kategori": "K3",
+    "penyelenggara": "Dinas Kesehatan Prov. DKI Jakarta",
+    "lokasi": "Gedung Sudin Kesehatan Jakut / Zoom Online",
+    "tgl_mulai": "2026-08-22",
+    "tgl_selesai": "2026-08-23",
+    "jp": 16,
+    "status": "Direncanakan",
+    "catatan": "Hybrid session. Link Zoom akan dikirimkan H-1 melalui grup WhatsApp.",
+    "peserta": [
+      {
+        "nip": "199211052019022004",
+        "nama": "Rina Kartika, A.Md.Keb",
+        "jabatan": "Bidan Terampil"
+      },
+      {
+        "nip": "199503122020121003",
+        "nama": "Eko Prasetyo, A.Md.AK",
+        "jabatan": "Pranata Laboratorium"
+      }
+    ]
+  },
+  {
+    "id": "JDW-2026-003",
+    "nama": "Pelatihan Manajemen Kepemimpinan & Akreditasi Puskesmas (PKP)",
+    "kategori": "Manajerial",
+    "penyelenggara": "Bapelkes Kemenkes RI Cilandak",
+    "lokasi": "Bapelkes Cilandak Jakarta Selatan",
+    "tgl_mulai": "2026-09-08",
+    "tgl_selesai": "2026-09-12",
+    "jp": 40,
+    "status": "Direncanakan",
+    "catatan": "Surat Tugas resmi dari Kepala Puskesmas wajib diserahkan saat registrasi ulang.",
+    "peserta": [
+      {
+        "nip": "198805152015031002",
+        "nama": "Ahmad Subagja, S.Kep, Ners",
+        "jabatan": "Perawat Ahli Pertama"
+      }
+    ]
+  },
+  {
+    "id": "JDW-2026-004",
+    "nama": "Sertifikasi Asuhan Persalinan Normal (APN) Terpadu",
+    "kategori": "Fungsional",
+    "penyelenggara": "IBI DKI Jakarta & Dinkes",
+    "lokasi": "RSUD Kepulauan Seribu / Pustu Panggang",
+    "tgl_mulai": "2026-09-20",
+    "tgl_selesai": "2026-09-24",
+    "jp": 35,
+    "status": "Terkonfirmasi",
+    "catatan": "Pelatihan praktek lapangan langsung di ruang bersalin.",
+    "peserta": [
+      {
+        "nip": "199211052019022004",
+        "nama": "Rina Kartika, A.Md.Keb",
+        "jabatan": "Bidan Terampil"
+      }
+    ]
+  },
+  {
+    "id": "JDW-2026-005",
+    "nama": "Pelatihan Pengelolaan Keuangan & Sistem Informasi SIMPEG",
+    "kategori": "Administrasi",
+    "penyelenggara": "Subbag TU & BPKD DKI",
+    "lokasi": "Ruang Rapat Utama Puskesmas",
+    "tgl_mulai": "2026-10-05",
+    "tgl_selesai": "2026-10-06",
+    "jp": 15,
+    "status": "Direncanakan",
+    "catatan": "Wajib membawa laptop masing-masing untuk simulasi penginputan.",
+    "peserta": [
+      {
+        "nip": "199503122020121003",
+        "nama": "Eko Prasetyo, A.Md.AK",
+        "jabatan": "Pranata Laboratorium"
+      }
+    ]
+  }
+]

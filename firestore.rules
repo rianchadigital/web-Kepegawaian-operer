@@ -50,6 +50,11 @@ service cloud.firestore {
     match /test/{docId} {
       allow read, write: if true;
     }
+
+    // App Configuration collection (GAS Web App URL, instansi settings)
+    match /app_config/{configId} {
+      allow read, write: if true;
+    }
   }
 }
 

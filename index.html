@@ -148,31 +148,59 @@
                 } catch(e) {
                     console.error("Firestore saveDiklat error:", e);
                 }
+            },
+            saveAppConfig: async function(cfg) {
+                if (!db || !cfg) return;
+                try {
+                    const clean = window.sanitizeForFirestore({
+                        ...cfg,
+                        updated_at: new Date().toISOString()
+                    });
+                    await setDoc(doc(db, 'app_config', 'general'), clean, { merge: true });
+                    console.log("🔥 App configuration saved to Firestore!");
+                } catch(e) {
+                    console.error("Firestore saveAppConfig error:", e);
+                }
+            },
+            loadAppConfig: async function() {
+                if (!db) return null;
+                try {
+                    const snap = await getDoc(doc(db, 'app_config', 'general'));
+                    if (snap.exists()) {
+                        return snap.data();
+                    }
+                } catch(e) {
+                    console.error("Firestore loadAppConfig error:", e);
+                }
+                return null;
             }
         };
 
-        // Realtime Firestore onSnapshot Listener
+        // Realtime Firestore onSnapshot Listener for Pegawai
         let isInitialLoad = true;
         try {
             onSnapshot(collection(db, 'pegawai'), (snapshot) => {
-                if (snapshot.empty && isInitialLoad) {
-                    isInitialLoad = false;
-                    return;
-                }
                 const firestoreList = [];
                 snapshot.forEach(docSnap => {
                     firestoreList.push(docSnap.data());
                 });
 
-                if (firestoreList.length > 0 && !isInitialLoad) {
-                    console.log(`🔥 Real-time sync update from Firestore: ${firestoreList.length} pegawai.`);
-                    if (window.editingPegawaiIndex === -1 && (!window.currentWizardStep || window.currentWizardStep === 1)) {
+                if (firestoreList.length > 0) {
+                    console.log(`🔥 Real-time sync update from Firestore: ${firestoreList.length} pegawai (isInitialLoad: ${isInitialLoad}).`);
+                    // If initial load OR not in the middle of editing a pegawai record:
+                    if (isInitialLoad || (window.editingPegawaiIndex === -1 && (!window.currentWizardStep || window.currentWizardStep === 1))) {
                         const normalized = firestoreList.map(p => typeof window.normalizePegawai === 'function' ? window.normalizePegawai(p) : p);
                         window.dataPegawai = normalized;
-                        localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(window.dataPegawai));
+                        try {
+                            localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(window.dataPegawai));
+                        } catch(e){}
                         if (typeof window.refreshAllData === 'function') {
                             window.refreshAllData();
                         }
+                        if (typeof window.updatePersistenceUiStats === 'function') {
+                            window.updatePersistenceUiStats();
+                        }
+                        $('#loadingOverlay').hide();
                     }
                 }
                 isInitialLoad = false;
@@ -182,6 +210,63 @@
         } catch(snapErr) {
             console.warn("Snapshot setup warn:", snapErr);
         }
+
+        // Realtime Firestore onSnapshot Listener for App Config (Automatic detection of GAS URL across all devices)
+        try {
+            onSnapshot(collection(db, 'app_config'), (snapshot) => {
+                snapshot.forEach(docSnap => {
+                    const cfg = docSnap.data();
+                    if (cfg && (cfg.gas_url || cfg.gas_webapp_url)) {
+                        const newUrl = String(cfg.gas_url || cfg.gas_webapp_url).trim();
+                        if (newUrl.startsWith('http')) {
+                            const current = localStorage.getItem('simpeg_gas_webapp_url');
+                            if (current !== newUrl) {
+                                console.log("🔥 Detected shared GAS Web App URL from database:", newUrl);
+                                localStorage.setItem('simpeg_gas_webapp_url', newUrl);
+                                if ($('#set_gas_webapp_url').length) {
+                                    $('#set_gas_webapp_url').val(newUrl);
+                                }
+                                $('#badgeGasStatus').removeClass('bg-warning bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
+                                $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-link me-1"></i> Terkoneksi Otomatis: ${newUrl.substring(0, 45)}...</span>`);
+                            }
+                        }
+                    }
+                });
+            }, (err) => {
+                console.warn("Firestore app_config listener:", err);
+            });
+        } catch(cfgErr) {
+            console.warn("Snapshot app_config warn:", cfgErr);
+        }
+
+        // Realtime Firestore onSnapshot Listener for Jadwal Diklat & Usulan
+        try {
+            onSnapshot(collection(db, 'jadwal_diklat'), (snapshot) => {
+                if (!snapshot.empty) {
+                    const list = [];
+                    snapshot.forEach(docSnap => list.push(docSnap.data()));
+                    if (list.length > 0) {
+                        window.diklatJadwalList = list;
+                        try { localStorage.setItem('simpeg_pkss_jadwal_diklat_db', JSON.stringify(list)); } catch(e){}
+                        if (typeof window.renderDiklatTable === 'function') window.renderDiklatTable();
+                    }
+                }
+            });
+        } catch(e){}
+
+        try {
+            onSnapshot(collection(db, 'usulan'), (snapshot) => {
+                if (!snapshot.empty) {
+                    const list = [];
+                    snapshot.forEach(docSnap => list.push(docSnap.data()));
+                    if (list.length > 0) {
+                        window.usulanDataList = list;
+                        try { localStorage.setItem('simpeg_usulan_list', JSON.stringify(list)); } catch(e){}
+                        if (typeof window.renderUsulanTable === 'function') window.renderUsulanTable();
+                    }
+                }
+            });
+        } catch(e){}
 
         // Validate Connection to Firestore as required by firebase-integration skill
         async function testFirebaseConnection() {
@@ -9049,7 +9134,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             window.quickTestAI('Berapa jumlah dokter dan total pegawai saat ini?');
         };
 
-        window.savePegawaiToLocalStorage = window.savePegawaiToStorage = function() {
+        window.savePegawaiToLocalStorage = window.savePegawaiToStorage = function(singlePegawai) {
             try {
                 if (dataPegawai && Array.isArray(dataPegawai)) {
                     localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
@@ -9058,12 +9143,18 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     if (typeof window.saveModuleDataToRumahweb === 'function') {
                         window.saveModuleDataToRumahweb('saveAllData', dataPegawai);
                     }
+                    // Persist to Firestore Cloud Database
+                    if (singlePegawai && window.firestoreSync && typeof window.firestoreSync.savePegawai === 'function') {
+                        window.firestoreSync.savePegawai(singlePegawai);
+                    } else if (window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
+                        window.firestoreSync.saveAllPegawaiToFirestore(dataPegawai);
+                    }
                     if (typeof window.updatePersistenceUiStats === 'function') {
                         window.updatePersistenceUiStats();
                     }
                 }
             } catch(e) {
-                console.warn("Gagal menyimpan ke localStorage:", e);
+                console.warn("Gagal menyimpan ke database:", e);
             }
         };
 
@@ -9116,9 +9207,15 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     window.refreshKopLivePreview();
                 }
 
-                // Simpan Google Apps Script Web App URL
+                // Simpan Google Apps Script Web App URL secara terpusat ke Firestore & Server Database
                 let gasUrl = $('#set_gas_webapp_url').val() ? $('#set_gas_webapp_url').val().trim() : '';
                 localStorage.setItem('simpeg_gas_webapp_url', gasUrl);
+                if (window.firestoreSync && typeof window.firestoreSync.saveAppConfig === 'function') {
+                    window.firestoreSync.saveAppConfig({ gas_url: gasUrl, gas_webapp_url: gasUrl });
+                }
+                if (typeof window.postToBackend === 'function') {
+                    window.postToBackend('saveAppConfig', { gas_webapp_url: gasUrl });
+                }
 
                 // Simpan Konfigurasi AI Chatbot (Gemini)
                 let geminiKey = $('#set_gemini_api_key').val() ? $('#set_gemini_api_key').val().trim() : '';
@@ -9147,7 +9244,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 localStorage.setItem('simpeg_wa_bot_test_phone', waBotTestPhone);
 
                 window.updatePersistenceUiStats();
-                showToast("Pengaturan Proteksi Data, WhatsApp Bot, GAS & AI Chatbot berhasil disimpan!", "success");
+                showToast("Pengaturan disimpan dan disinkronkan ke Database Terpusat!", "success");
 
                 if (gasUrl && isAutoSync && typeof window.syncAllToRumahweb === 'function') {
                     window.syncAllToRumahweb(false);
@@ -9177,7 +9274,13 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         $('#badgeGasStatus').removeClass('bg-info bg-warning bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung!');
                         $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Terhubung: Spreadsheet "${res.spreadsheet_name || 'SIMPEG'}" | Folder Drive "${res.drive_folder || 'SIMPEG_PKSS_ARSIP_DIGITAL'}"</span>`);
                         localStorage.setItem('simpeg_gas_webapp_url', gasUrl);
-                        showToast("Koneksi Google Spreadsheet & Google Drive Berhasil!", "success");
+                        if (window.firestoreSync && typeof window.firestoreSync.saveAppConfig === 'function') {
+                            window.firestoreSync.saveAppConfig({ gas_url: gasUrl, gas_webapp_url: gasUrl });
+                        }
+                        if (typeof window.postToBackend === 'function') {
+                            window.postToBackend('saveAppConfig', { gas_webapp_url: gasUrl });
+                        }
+                        showToast("Koneksi Google Spreadsheet Berhasil & Tersinkron ke Semua Komputer!", "success");
                     } else {
                         throw new Error(res.message || "Respon tidak valid");
                     }
@@ -9738,12 +9841,15 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.getApiEndpoint = function(action) {
+            let isNode = (window.location.port === "3000" || window.location.hostname === "localhost" || window.location.hostname.includes("run.app"));
+            if (action === 'getAllAppModules' || action === 'getAppConfig' || action === 'getAllData') {
+                return isNode ? ('/api/gas?action=' + encodeURIComponent(action)) : ('api.php?action=' + encodeURIComponent(action));
+            }
             let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url');
             if (customGasUrl && customGasUrl.trim().startsWith('http')) {
                 let cleanUrl = customGasUrl.trim();
                 return action ? (cleanUrl + (cleanUrl.includes('?') ? '&' : '?') + 'action=' + encodeURIComponent(action)) : cleanUrl;
             }
-            let isNode = (window.location.port === "3000" || window.location.hostname === "localhost" || window.location.hostname.includes("run.app"));
             if (isNode) {
                 return action ? '/api/gas?action=' + encodeURIComponent(action) : '/api/gas';
             }
@@ -9751,8 +9857,20 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.postToBackend = async function(action, payload) {
+            // Also sync data to Firestore Cloud Database
+            if (action === 'savePegawaiData' || action === 'saveAllData') {
+                const list = Array.isArray(payload) ? payload : (payload && payload.pegawai ? payload.pegawai : []);
+                if (list.length > 0 && window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
+                    window.firestoreSync.saveAllPegawaiToFirestore(list);
+                }
+            } else if (action === 'saveAppConfig' || action === 'saveGasUrl') {
+                if (window.firestoreSync && typeof window.firestoreSync.saveAppConfig === 'function') {
+                    window.firestoreSync.saveAppConfig(payload);
+                }
+            }
+
             let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url');
-            let isGas = customGasUrl && customGasUrl.trim().startsWith('http');
+            let isGas = customGasUrl && customGasUrl.trim().startsWith('http') && action !== 'getAllAppModules' && action !== 'getAppConfig' && action !== 'saveAppConfig';
 
             if (isGas) {
                 let cleanGasUrl = customGasUrl.trim();
@@ -9765,6 +9883,8 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     });
                     if (response.ok) {
                         let json = await response.json();
+                        // Also persist to server endpoint for centralized multi-device access
+                        postToServerEndpoint(action, payload);
                         return json;
                     }
                 } catch(gasErr) {
@@ -9772,6 +9892,10 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 }
             }
 
+            return await postToServerEndpoint(action, payload);
+        };
+
+        async function postToServerEndpoint(action, payload) {
             // Fallback to local server or api.php
             let endpoint = (window.location.port === "3000" || window.location.hostname === "localhost" || window.location.hostname.includes("run.app"))
                 ? ('/api/gas?action=' + encodeURIComponent(action))
@@ -9797,7 +9921,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     return { success: false, offline: true, error: e.message };
                 }
             }
-        };
+        }
 
         window.saveModuleDataToRumahweb = async function(action, payload, successMsg) {
             let res = await window.postToBackend(action, payload);
@@ -9894,7 +10018,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.loadDataFromGAS = function(forceRefresh = false) {
-            $('#loadingText').text("Memuat Data dari Google Spreadsheet & Server...");
+            $('#loadingText').text("Memuat Data dari Cloud Database & Spreadsheet...");
             $('#loadingOverlay').css('display', 'flex');
 
             let localStored = localStorage.getItem('simpeg_pkss_pegawai_db');
@@ -9910,45 +10034,99 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 } catch(e){}
             }
 
-            const applyPegawaiData = (serverPegawai, sourceLabel = "Google Spreadsheet / Database") => {
-                let validServer = Array.isArray(serverPegawai);
+            const applyPegawaiData = (serverPegawai, sourceLabel = "Database & Spreadsheet") => {
+                let validServer = Array.isArray(serverPegawai) && serverPegawai.length > 0;
 
-                if (validServer && serverPegawai.length > 0) {
-                    // Normalize all fields from Spreadsheet/GAS
-                    const normalized = serverPegawai.map(p => window.normalizePegawai(p));
-                    dataPegawai = normalized;
-                    localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
+                if (validServer) {
+                    // Filter out any non-pegawai corrupted records
+                    const filtered = serverPegawai.filter(p => {
+                        if (!p || typeof p !== 'object') return false;
+                        if (p.penyelenggara && p.tgl_selesai && !p.nip && !p.nik && !p.jabatan) return false;
+                        return Boolean(p.nip || p.nik || p.nama || p.jabatan);
+                    });
 
-                    // Auto-sync any new Unit Tugas from spreadsheet rows to masterUnitTugasList
-                    if (window.masterUnitTugasList && Array.isArray(window.masterUnitTugasList)) {
-                        let hasNewUnit = false;
-                        dataPegawai.forEach(p => {
-                            const uName = (p.tempat_tugas || p.nama_ukpd || p.ukpd || '').trim();
-                            if (uName && uName !== '-') {
-                                const exists = window.masterUnitTugasList.some(x => (x.nama || '').trim().toLowerCase() === uName.toLowerCase());
-                                if (!exists) {
-                                    window.masterUnitTugasList.push({
-                                        id: window.masterUnitTugasList.length + 1,
-                                        nama: uName,
-                                        status: 'Aktif',
-                                        updated_at: new Date().toLocaleString('id-ID')
-                                    });
-                                    hasNewUnit = true;
-                                }
-                            }
-                        });
-                        if (hasNewUnit && typeof window.saveMasterJabatanToStorage === 'function') {
-                            window.saveMasterJabatanToStorage();
+                    if (filtered.length > 0) {
+                        const normalized = filtered.map(p => window.normalizePegawai(p));
+                        dataPegawai = normalized;
+                        try {
+                            localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
+                        } catch(e){}
+
+                        // Persist to Cloud Firestore so all other computers/browsers receive it!
+                        if (window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
+                            window.firestoreSync.saveAllPegawaiToFirestore(dataPegawai);
                         }
-                    }
 
-                    refreshAllData();
-                    if (typeof window.updatePersistenceUiStats === 'function') {
-                        window.updatePersistenceUiStats();
+                        // Auto-sync any new Unit Tugas from spreadsheet rows to masterUnitTugasList
+                        if (window.masterUnitTugasList && Array.isArray(window.masterUnitTugasList)) {
+                            let hasNewUnit = false;
+                            dataPegawai.forEach(p => {
+                                const uName = (p.tempat_tugas || p.nama_ukpd || p.ukpd || '').trim();
+                                if (uName && uName !== '-') {
+                                    const exists = window.masterUnitTugasList.some(x => (x.nama || '').trim().toLowerCase() === uName.toLowerCase());
+                                    if (!exists) {
+                                        window.masterUnitTugasList.push({
+                                            id: window.masterUnitTugasList.length + 1,
+                                            nama: uName,
+                                            status: 'Aktif',
+                                            updated_at: new Date().toLocaleString('id-ID')
+                                        });
+                                        hasNewUnit = true;
+                                    }
+                                }
+                            });
+                            if (hasNewUnit && typeof window.saveMasterJabatanToStorage === 'function') {
+                                window.saveMasterJabatanToStorage();
+                            }
+                        }
+
+                        refreshAllData();
+                        if (typeof window.updatePersistenceUiStats === 'function') {
+                            window.updatePersistenceUiStats();
+                        }
+                        $('#loadingOverlay').hide();
+                        showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari ${sourceLabel}!`, "success");
+                        return;
                     }
-                    $('#loadingOverlay').hide();
-                    showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari ${sourceLabel}!`, "success");
-                } else if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
+                }
+
+                // If server data was empty or invalid, try Firestore Cloud Database directly
+                if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
+                    window.firestoreSync.loadPegawaiList().then(fsList => {
+                        if (Array.isArray(fsList) && fsList.length > 0) {
+                            const normalized = fsList.map(p => window.normalizePegawai(p));
+                            dataPegawai = normalized;
+                            try { localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai)); } catch(e){}
+                            refreshAllData();
+                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                            $('#loadingOverlay').hide();
+                            showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari Cloud Database Firestore!`, "success");
+                        } else if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
+                            dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
+                            refreshAllData();
+                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                            $('#loadingOverlay').hide();
+                            showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
+                        } else {
+                            dataPegawai = [];
+                            refreshAllData();
+                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                            $('#loadingOverlay').hide();
+                            showToast("Data pegawai belum tersedia.", "info");
+                        }
+                    }).catch(() => {
+                        if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
+                            dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
+                            refreshAllData();
+                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                            $('#loadingOverlay').hide();
+                            showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
+                        }
+                    });
+                    return;
+                }
+
+                if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
                     dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
                     localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
                     refreshAllData();
@@ -9976,6 +10154,22 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 .then(res => {
                     if (res && res.success && res.data) {
                         const d = res.data;
+                        // Auto-detect and sync GAS URL if set on server
+                        if (d.config && (d.config.gas_webapp_url || d.config.gas_url)) {
+                            const remoteGas = (d.config.gas_webapp_url || d.config.gas_url).trim();
+                            const currentGas = (localStorage.getItem('simpeg_gas_webapp_url') || '').trim();
+                            if (remoteGas && remoteGas !== currentGas) {
+                                console.log("🔥 Auto-detected centralized GAS URL from server:", remoteGas);
+                                localStorage.setItem('simpeg_gas_webapp_url', remoteGas);
+                                if ($('#set_gas_webapp_url').length) $('#set_gas_webapp_url').val(remoteGas);
+                                $('#badgeGasStatus').removeClass('bg-warning bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
+                            }
+                        }
+                        if (d.diklat && Array.isArray(d.diklat) && d.diklat.length > 0) {
+                            window.diklatJadwalList = d.diklat;
+                            localStorage.setItem('simpeg_pkss_jadwal_diklat_db', JSON.stringify(d.diklat));
+                            if (typeof window.renderDiklatTable === 'function') window.renderDiklatTable();
+                        }
                         if (d.pengguna && Array.isArray(d.pengguna) && d.pengguna.length > 0) {
                             localStorage.setItem('simpeg_admin_pengguna', JSON.stringify(d.pengguna));
                             if (typeof window.penggunaList !== 'undefined') window.penggunaList = d.pengguna;
@@ -9983,6 +10177,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         if (d.usulan && Array.isArray(d.usulan) && d.usulan.length > 0) {
                             window.usulanDataList = d.usulan;
                             localStorage.setItem('simpeg_usulan_list', JSON.stringify(d.usulan));
+                            if (typeof window.renderUsulanTable === 'function') window.renderUsulanTable();
                         }
                         if (d.disiplin && typeof d.disiplin === 'object' && Object.keys(d.disiplin).length > 0) {
                             localStorage.setItem('simpeg_pkss_disiplin_db', JSON.stringify(d.disiplin));
@@ -9991,53 +10186,72 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                             window.gapKompetensiList = d.gap;
                             localStorage.setItem('simpeg_gap_kompetensi_list', JSON.stringify(d.gap));
                         }
-                        applyPegawaiData(d.pegawai, "Google Spreadsheet & Database");
-                        return;
+                        if (d.pegawai && Array.isArray(d.pegawai) && d.pegawai.length > 0) {
+                            applyPegawaiData(d.pegawai, "Database Server Terpusat");
+                            return;
+                        }
                     }
                     throw new Error("No module bundle");
                 })
                 .catch(() => {
-                    let primaryEndpoint = window.getApiEndpoint('getPegawaiData');
+                    // Try Firestore directly
+                    if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
+                        window.firestoreSync.loadPegawaiList().then(fsList => {
+                            if (Array.isArray(fsList) && fsList.length > 0) {
+                                applyPegawaiData(fsList, "Cloud Database Firestore");
+                                return;
+                            }
+                            fetchFromGasDirect();
+                        }).catch(() => {
+                            fetchFromGasDirect();
+                        });
+                    } else {
+                        fetchFromGasDirect();
+                    }
+                });
 
-                    fetch(primaryEndpoint)
-                        .then(res => {
-                            if (!res.ok) throw new Error("HTTP " + res.status);
-                            return res.json();
-                        })
-                        .then(data => {
-                            const list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
-                            applyPegawaiData(list, "Google Spreadsheet");
-                        })
-                        .catch(err => {
-                            fetch('api.php?action=getPegawaiData')
-                                .then(r => r.ok ? r.json() : Promise.reject())
-                                .then(dataPhp => {
-                                    applyPegawaiData(dataPhp, "Database Server");
-                                })
-                                .catch(errPhp => {
-                                    if (localPegawai && localPegawai.length > 0) {
-                                        dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
+            function fetchFromGasDirect() {
+                let primaryEndpoint = window.getApiEndpoint('getPegawaiData');
+
+                fetch(primaryEndpoint)
+                    .then(res => {
+                        if (!res.ok) throw new Error("HTTP " + res.status);
+                        return res.json();
+                    })
+                    .then(data => {
+                        const list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+                        applyPegawaiData(list, "Google Spreadsheet");
+                    })
+                    .catch(err => {
+                        fetch('api.php?action=getPegawaiData')
+                            .then(r => r.ok ? r.json() : Promise.reject())
+                            .then(dataPhp => {
+                                applyPegawaiData(dataPhp, "Database Server");
+                            })
+                            .catch(errPhp => {
+                                if (localPegawai && localPegawai.length > 0) {
+                                    dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
+                                    refreshAllData();
+                                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                                    $('#loadingOverlay').hide();
+                                    showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
+                                    return;
+                                }
+
+                                fetch('data_pegawai_db.json')
+                                    .then(r => r.ok ? r.json() : Promise.reject())
+                                    .then(jsonRes => {
+                                        applyPegawaiData(Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []), "Database JSON");
+                                    })
+                                    .catch(e2 => {
+                                        $('#loadingOverlay').hide();
                                         refreshAllData();
                                         if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                        $('#loadingOverlay').hide();
-                                        showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
-                                        return;
-                                    }
-
-                                    fetch('data_pegawai_db.json')
-                                        .then(r => r.ok ? r.json() : Promise.reject())
-                                        .then(jsonRes => {
-                                            applyPegawaiData(Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []), "Database JSON");
-                                        })
-                                        .catch(e2 => {
-                                            $('#loadingOverlay').hide();
-                                            refreshAllData();
-                                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                            showToast("Memuat data kepegawaian bawaan.", "info");
-                                        });
-                                });
-                        });
-                });
+                                        showToast("Memuat data kepegawaian bawaan.", "info");
+                                    });
+                            });
+                    });
+            }
         };
 
         function refreshAllData() {
