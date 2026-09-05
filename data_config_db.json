@@ -1,4 +1,5 @@
 {
-  "gas_webapp_url": "https://script.google.com/macros/s/test-url/exec",
+  "gas_webapp_url": "",
+  "gas_disabled": true,
   "instansi": "Puskesmas Kepulauan Seribu Selatan"
 }

@@ -583,12 +583,10 @@ let disiplinDb = loadJsonFile(DISIPLIN_FILE, {});
 let penggunaDb = loadJsonFile(PENGGUNA_FILE, []);
 let masterDb = loadJsonFile(MASTER_FILE, {});
 let configDb = loadJsonFile(CONFIG_FILE, { 
-  gas_webapp_url: 'https://script.google.com/macros/s/AKfycbxArGlKoJvyePYmLCyqUJoxfOqyoVnksy64YYYRr8PCwpYx27FDXMvk0DntCZsL-C7c/exec', 
+  gas_webapp_url: '', 
+  gas_disabled: true,
   instansi: 'Puskesmas Kepulauan Seribu Selatan' 
 });
-if (!configDb.gas_webapp_url) {
-  configDb.gas_webapp_url = 'https://script.google.com/macros/s/AKfycbxArGlKoJvyePYmLCyqUJoxfOqyoVnksy64YYYRr8PCwpYx27FDXMvk0DntCZsL-C7c/exec';
-}
 
 // Lazy Gemini Client setup
 let genAIClient: GoogleGenAI | null = null;
