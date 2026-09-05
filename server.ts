@@ -471,15 +471,124 @@ function savePayrollDb(data: any[]) {
   }
 }
 
+const INITIAL_DIKLAT = [
+  {
+    id: 'JDW-2026-001',
+    nama: 'Pelatihan Penanganan Kegawatdaruratan Medis Pulau & BTCLS',
+    kategori: 'Teknis Medis',
+    penyelenggara: 'Bapelkes Kemenkes RI & HIPGABI',
+    lokasi: 'Auditorium Puskesmas Kepulauan Seribu Selatan',
+    tgl_mulai: '2026-08-12',
+    tgl_selesai: '2026-08-15',
+    jp: 30,
+    status: 'Terkonfirmasi',
+    catatan: 'Peserta wajib membawa pakaian dinas lapangan & modul pelatihan.',
+    peserta: [
+      { nip: '199004122020011005', nama: 'dr. Budi Santoso, Sp.PD', jabatan: 'Dokter Spesialis' },
+      { nip: '198805152015031002', nama: 'Ahmad Subagja, S.Kep, Ners', jabatan: 'Perawat Ahli Pertama' },
+      { nip: '199408202022032008', nama: 'Siti Aminah, A.Md.Kep', jabatan: 'Perawat Mahir' }
+    ]
+  },
+  {
+    id: 'JDW-2026-002',
+    nama: 'Workshop Keselamatan Pasien (Patient Safety) & Manajemen K3',
+    kategori: 'K3',
+    penyelenggara: 'Dinas Kesehatan Prov. DKI Jakarta',
+    lokasi: 'Gedung Sudin Kesehatan Jakut / Zoom Online',
+    tgl_mulai: '2026-08-22',
+    tgl_selesai: '2026-08-23',
+    jp: 16,
+    status: 'Direncanakan',
+    catatan: 'Hybrid session. Link Zoom akan dikirimkan H-1.',
+    peserta: [
+      { nip: '199211052019022004', nama: 'Rina Kartika, A.Md.Keb', jabatan: 'Bidan Terampil' },
+      { nip: '199503122020121003', nama: 'Eko Prasetyo, A.Md.AK', jabatan: 'Pranata Laboratorium' }
+    ]
+  }
+];
+
+const INITIAL_USULAN = [
+  {
+    id: 'USL-202603-001',
+    jenis: 'tunjangan',
+    tgl: '2026-03-10',
+    nip: '199004122020011005',
+    nama: 'dr. Budi Santoso, Sp.PD',
+    jabatan: 'Dokter Spesialis Penyakit Dalam',
+    pangkat: 'Penata Muda, III/a',
+    unit: 'Puskesmas Kepulauan Seribu Selatan',
+    kel_jenis: 'Suami / Istri',
+    kel_nama: 'Siti Rahmawati, S.Pd',
+    kel_nik: '3171025508920003',
+    kel_hub: 'Istri',
+    kel_tgl: '2024-02-14',
+    kel_status: 'PNS Guru',
+    berkas: 'Buku Nikah, KK, KTP Istri, SK CPNS/PNS',
+    catatan: 'Pengajuan tunjangan istri pasca pernikahan bulan Februari',
+    status: 'Menunggu Verifikasi',
+    nosk: '',
+    catatan_verif: ''
+  },
+  {
+    id: 'USL-202603-002',
+    jenis: 'tunjangan',
+    tgl: '2026-02-18',
+    nip: '199408202022032008',
+    nama: 'Siti Aminah, A.Md.Kep',
+    jabatan: 'Perawat Mahir',
+    pangkat: 'Pengatur Tk.I, II/d',
+    unit: 'Puskesmas Pembantu Pulau Untung Jawa',
+    kel_jenis: 'Anak ke-1',
+    kel_nama: 'Ahmad Faiz Al-Fatih',
+    kel_nik: '3171021201260001',
+    kel_hub: 'Anak Kandung',
+    kel_tgl: '2026-01-12',
+    kel_status: 'Belum Bekerja',
+    berkas: 'Akta Kelahiran, Kartu Keluarga, Surat Keterangan Lahir',
+    catatan: 'Pengajuan anak pertama lahir Januari 2026',
+    status: 'Disetujui',
+    nosk: '45/PKSS/TU/III/2026',
+    catatan_verif: 'Berkas lengkap & memenuhi syarat penetapan tunjangan keluarga'
+  },
+  {
+    id: 'USL-202603-003',
+    jenis: 'pangkat',
+    tgl: '2026-03-01',
+    nip: '198805152015031002',
+    nama: 'Ahmad Subagja, S.Kep, Ners',
+    jabatan: 'Perawat Ahli Pertama',
+    pangkat: 'Penata Muda, III/a',
+    unit: 'Puskesmas Kepulauan Seribu Selatan',
+    jenis_kp: 'Kenaikan Pangkat Jabatan Fungsional',
+    pangkat_lama: 'Penata Muda, III/a',
+    pangkat_usulan: 'Penata Muda Tk.I, III/b',
+    tmt_usulan: '01 April 2026',
+    mkg: '04 Tahun 00 Bulan',
+    berkas: 'PAK Terakhir (150.5 AK), SK Pangkat Terakhir, SK Jabfung, SKP 2 Tahun',
+    catatan: 'KP Periode April 2026 telah memenuhi AK komulatif 150',
+    status: 'Disetujui',
+    nosk: '88/DINKES/KP/2026',
+    catatan_verif: 'Memenuhi Syarat KP Reguler/Jabfung Periode April 2026'
+  }
+];
+
 let pegawaiDb = loadPegawaiDb();
 let payrollDb = loadPayrollDb();
-let diklatDb = loadJsonFile(DIKLAT_FILE, []);
-let usulanDb = loadJsonFile(USULAN_FILE, []);
+let diklatDb = loadJsonFile(DIKLAT_FILE, INITIAL_DIKLAT);
+if (!Array.isArray(diklatDb) || diklatDb.length === 0) diklatDb = INITIAL_DIKLAT;
+let usulanDb = loadJsonFile(USULAN_FILE, INITIAL_USULAN);
+if (!Array.isArray(usulanDb) || usulanDb.length === 0) usulanDb = INITIAL_USULAN;
 let gapDb = loadJsonFile(GAP_FILE, []);
 let disiplinDb = loadJsonFile(DISIPLIN_FILE, {});
 let penggunaDb = loadJsonFile(PENGGUNA_FILE, []);
 let masterDb = loadJsonFile(MASTER_FILE, {});
-let configDb = loadJsonFile(CONFIG_FILE, { gas_webapp_url: '', instansi: 'Puskesmas Kepulauan Seribu Selatan' });
+let configDb = loadJsonFile(CONFIG_FILE, { 
+  gas_webapp_url: 'https://script.google.com/macros/s/AKfycbxArGlKoJvyePYmLCyqUJoxfOqyoVnksy64YYYRr8PCwpYx27FDXMvk0DntCZsL-C7c/exec', 
+  instansi: 'Puskesmas Kepulauan Seribu Selatan' 
+});
+if (!configDb.gas_webapp_url) {
+  configDb.gas_webapp_url = 'https://script.google.com/macros/s/AKfycbxArGlKoJvyePYmLCyqUJoxfOqyoVnksy64YYYRr8PCwpYx27FDXMvk0DntCZsL-C7c/exec';
+}
 
 // Lazy Gemini Client setup
 let genAIClient: GoogleGenAI | null = null;

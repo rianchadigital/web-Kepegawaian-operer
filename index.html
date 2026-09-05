@@ -23,10 +23,10 @@
     <!-- Firebase JS SDK Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDocs, deleteDoc, collection, onSnapshot, getDocFromServer } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDocs, deleteDoc, collection, onSnapshot, getDocFromServer, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-        const firebaseConfig = {
+        const DEFAULT_FIREBASE_CONFIG = {
             projectId: "graphical-marking-lxctm",
             appId: "1:1098525805857:web:f21be48c31a359dd0dc260",
             apiKey: "AIzaSyDlvP0etFd1y0MOt1ccCfNQovUIXNhKj5s",
@@ -35,14 +35,65 @@
             storageBucket: "graphical-marking-lxctm.firebasestorage.app",
             messagingSenderId: "1098525805857"
         };
+        window.DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-        const auth = getAuth(app);
+        let activeFirebaseConfig = { ...DEFAULT_FIREBASE_CONFIG };
+        let isUsingCustomFirebase = false;
+        try {
+            const savedCustom = localStorage.getItem('simpeg_custom_firebase_config');
+            if (savedCustom) {
+                const parsed = JSON.parse(savedCustom);
+                if (parsed && typeof parsed === 'object' && parsed.projectId && parsed.apiKey) {
+                    if (parsed.projectId !== DEFAULT_FIREBASE_CONFIG.projectId) {
+                        isUsingCustomFirebase = true;
+                        // Custom project: in Firebase, standard databases are named '(default)'
+                        let customDbId = parsed.firestoreDatabaseId;
+                        if (!customDbId || customDbId === DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId) {
+                            customDbId = '(default)';
+                        }
+                        activeFirebaseConfig = {
+                            projectId: parsed.projectId,
+                            apiKey: parsed.apiKey,
+                            authDomain: parsed.authDomain || `${parsed.projectId}.firebaseapp.com`,
+                            storageBucket: parsed.storageBucket || `${parsed.projectId}.firebasestorage.app`,
+                            messagingSenderId: parsed.messagingSenderId || '',
+                            appId: parsed.appId || '',
+                            firestoreDatabaseId: customDbId
+                        };
+                    } else {
+                        activeFirebaseConfig = { ...DEFAULT_FIREBASE_CONFIG, ...parsed };
+                    }
+                }
+            }
+        } catch(e) {
+            console.warn("Could not load custom Firebase config:", e);
+        }
+        window.activeFirebaseConfig = activeFirebaseConfig;
+        window.isUsingCustomFirebase = isUsingCustomFirebase;
 
-        window.firebaseApp = app;
-        window.firebaseDb = db;
-        window.firebaseAuth = auth;
+        let app, db, auth;
+        try {
+            app = initializeApp(activeFirebaseConfig);
+            if (activeFirebaseConfig.firestoreDatabaseId && activeFirebaseConfig.firestoreDatabaseId !== '(default)') {
+                db = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
+            } else {
+                db = getFirestore(app);
+            }
+            auth = getAuth(app);
+            window.firebaseApp = app;
+            window.firebaseDb = db;
+            window.firebaseAuth = auth;
+            window.isFirestoreReady = true;
+        } catch(initErr) {
+            console.warn("Firebase initialization warning with active config, falling back to default:", initErr);
+            app = initializeApp(DEFAULT_FIREBASE_CONFIG);
+            db = getFirestore(app, DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId);
+            auth = getAuth(app);
+            window.firebaseApp = app;
+            window.firebaseDb = db;
+            window.firebaseAuth = auth;
+            window.isFirestoreReady = true;
+        }
 
         // Helper to sanitize object so Firestore doesn't reject undefined properties
         window.sanitizeForFirestore = function(raw) {
@@ -108,13 +159,20 @@
             saveAllPegawaiToFirestore: async function(list) {
                 if (!db || !Array.isArray(list) || list.length === 0) return;
                 try {
-                    console.log(`🔥 Syncing ${list.length} pegawai records to Firestore...`);
-                    for (const p of list) {
-                        const rawId = p.nip || p.NIP || p.nik || p.NIK || ('PEG_' + Date.now());
-                        const docId = String(rawId).trim().replace(/[\/\s\.]/g, '_');
-                        await setDoc(doc(db, 'pegawai', docId), window.sanitizeForFirestore(p), { merge: true });
+                    console.log(`🔥 Batch syncing ${list.length} pegawai records to Firestore...`);
+                    // Split into chunks of 400 for Firestore batch write
+                    const chunkSize = 400;
+                    for (let i = 0; i < list.length; i += chunkSize) {
+                        const batch = writeBatch(db);
+                        const chunk = list.slice(i, i + chunkSize);
+                        for (const p of chunk) {
+                            const rawId = p.nip || p.NIP || p.nik || p.NIK || ('PEG_' + Date.now());
+                            const docId = String(rawId).trim().replace(/[\/\s\.]/g, '_');
+                            batch.set(doc(db, 'pegawai', docId), window.sanitizeForFirestore(p), { merge: true });
+                        }
+                        await batch.commit();
                     }
-                    console.log("🔥 Sync to Firestore complete!");
+                    console.log("🔥 Batch sync to Firestore complete!");
                 } catch(e) {
                     console.error("🔥 Firestore saveAllPegawai error:", e);
                 }
@@ -190,7 +248,11 @@
                     // If initial load OR not in the middle of editing a pegawai record:
                     if (isInitialLoad || (window.editingPegawaiIndex === -1 && (!window.currentWizardStep || window.currentWizardStep === 1))) {
                         const normalized = firestoreList.map(p => typeof window.normalizePegawai === 'function' ? window.normalizePegawai(p) : p);
-                        window.dataPegawai = normalized;
+                        if (typeof window.setDataPegawaiGlobal === 'function') {
+                            window.setDataPegawaiGlobal(normalized);
+                        } else {
+                            window.dataPegawai = normalized;
+                        }
                         try {
                             localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(window.dataPegawai));
                         } catch(e){}
@@ -219,15 +281,16 @@
                     if (cfg && (cfg.gas_url || cfg.gas_webapp_url)) {
                         const newUrl = String(cfg.gas_url || cfg.gas_webapp_url).trim();
                         if (newUrl.startsWith('http')) {
-                            const current = localStorage.getItem('simpeg_gas_webapp_url');
-                            if (current !== newUrl) {
-                                console.log("🔥 Detected shared GAS Web App URL from database:", newUrl);
-                                localStorage.setItem('simpeg_gas_webapp_url', newUrl);
-                                if ($('#set_gas_webapp_url').length) {
-                                    $('#set_gas_webapp_url').val(newUrl);
-                                }
-                                $('#badgeGasStatus').removeClass('bg-warning bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
-                                $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-link me-1"></i> Terkoneksi Otomatis: ${newUrl.substring(0, 45)}...</span>`);
+                            console.log("🔥 Detected shared GAS Web App URL from database:", newUrl);
+                            localStorage.setItem('simpeg_gas_webapp_url', newUrl);
+                            window.remoteGasWebappUrl = newUrl;
+                            if ($('#set_gas_webapp_url').length) {
+                                $('#set_gas_webapp_url').val(newUrl);
+                            }
+                            $('#badgeGasStatus').removeClass('bg-warning bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
+                            $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-link me-1"></i> Terkoneksi Otomatis: ${newUrl.substring(0, 45)}...</span>`);
+                            if (typeof window.updatePersistenceUiStats === 'function') {
+                                window.updatePersistenceUiStats();
                             }
                         }
                     }
@@ -268,18 +331,211 @@
             });
         } catch(e){}
 
-        // Validate Connection to Firestore as required by firebase-integration skill
-        async function testFirebaseConnection() {
+        // Validate Connection to Firestore with detailed latency and status reporting
+        window.testFirebaseConnectionDetails = async function() {
+            const statusBadge = $('#fb-connection-badge');
+            const latencyEl = $('#fb-latency-val');
+            const lastCheckEl = $('#fb-last-check');
+            const btn = $('#btn-test-fb');
+            const origBtn = btn.length ? btn.html() : '';
+            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menguji...');
+
+            if (statusBadge.length) {
+                statusBadge.removeClass('bg-success bg-danger bg-secondary').addClass('bg-warning text-dark').html('<i class="fas fa-spinner fa-spin me-1"></i> Menguji...');
+            }
+
+            const startTime = performance.now();
             try {
-                await getDocFromServer(doc(db, 'test', 'connection'));
-                console.log("🔥 Firebase Firestore connection test completed.");
+                const testRef = doc(db, 'test', 'connection');
+                await setDoc(testRef, {
+                    ping: 'pong',
+                    timestamp: new Date().toISOString(),
+                    platform: navigator.userAgent
+                }, { merge: true });
+
+                await getDocFromServer(testRef);
+                const elapsed = Math.round(performance.now() - startTime);
+
+                if (statusBadge.length) {
+                    statusBadge.removeClass('bg-warning bg-danger bg-secondary').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung & Siap');
+                }
+                if (latencyEl.length) latencyEl.text(elapsed + ' ms');
+                if (lastCheckEl.length) lastCheckEl.text(new Date().toLocaleTimeString('id-ID') + ' WIB');
+
+                $('#fb-diagnostic-alert').addClass('d-none');
+
+                if (typeof showToast === 'function') {
+                    showToast(`🔥 Firebase Firestore Terhubung! Latensi: ${elapsed} ms. Database: ${activeFirebaseConfig.firestoreDatabaseId || '(default)'}`, "success");
+                }
+                if (btn.length) btn.prop('disabled', false).html(origBtn);
+                return { success: true, latency: elapsed, config: activeFirebaseConfig };
             } catch (error) {
-                if (error instanceof Error && error.message.includes('the client is offline')) {
-                    console.error("Please check your Firebase configuration.");
+                const elapsed = Math.round(performance.now() - startTime);
+                const errMsg = error.message || String(error);
+                const errCode = error.code || '';
+
+                if (statusBadge.length) {
+                    statusBadge.removeClass('bg-warning bg-success bg-secondary').addClass('bg-danger text-white').html('<i class="fas fa-times-circle me-1"></i> Gagal Terhubung');
+                }
+                if (latencyEl.length) latencyEl.text(elapsed + ' ms (Gagal)');
+
+                if (typeof window.renderFirebaseDiagnostic === 'function') {
+                    window.renderFirebaseDiagnostic(errCode, errMsg);
+                }
+
+                if (typeof showToast === 'function') {
+                    showToast("Gagal terhubung ke Firebase: " + errMsg, "danger");
+                }
+                if (btn.length) btn.prop('disabled', false).html(origBtn);
+                return { success: false, error: errMsg, code: errCode };
+            }
+        };
+
+        // Instant 1-Click Sync of all SIMPEG data to Firebase Firestore
+        window.syncAllSimpegToFirebase = async function() {
+            if (!db) {
+                if (typeof showToast === 'function') showToast("Database Firebase belum siap.", "danger");
+                return;
+            }
+            const btn = $('#btn-sync-all-fb');
+            const originalText = btn.length ? btn.html() : '';
+            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menyinkronkan...');
+
+            try {
+                const pegawai = window.getDataPegawaiGlobal ? window.getDataPegawaiGlobal() : (window.dataPegawai || []);
+                const usulan = window.usulanDataList || [];
+                const diklat = window.diklatJadwalList || [];
+                const instansi = $('#set_nama_instansi').val() || localStorage.getItem('simpeg_nama_instansi') || 'PUSKESMAS KEPULAUAN SERIBU SELATAN';
+                const gasUrl = localStorage.getItem('simpeg_gas_webapp_url') || '';
+
+                if (pegawai.length > 0) {
+                    await window.firestoreSync.saveAllPegawaiToFirestore(pegawai);
+                }
+                for (const u of usulan) {
+                    await window.firestoreSync.saveUsulan(u);
+                }
+                for (const d of diklat) {
+                    await window.firestoreSync.saveDiklat(d);
+                }
+                await window.firestoreSync.saveAppConfig({
+                    instansi: instansi,
+                    gas_url: gasUrl,
+                    gas_webapp_url: gasUrl,
+                    last_full_sync: new Date().toISOString()
+                });
+
+                if (btn.length) btn.prop('disabled', false).html(originalText);
+                if (typeof showToast === 'function') {
+                    showToast(`🔥 Sukses menyinkronkan ${pegawai.length} Pegawai, ${usulan.length} Usulan, dan ${diklat.length} Diklat ke Cloud Firebase!`, "success");
+                }
+                window.testFirebaseConnectionDetails();
+            } catch(err) {
+                if (btn.length) btn.prop('disabled', false).html(originalText);
+                if (typeof showToast === 'function') {
+                    showToast("Gagal menyinkronkan data ke Firebase: " + (err.message || err), "danger");
                 }
             }
-        }
-        testFirebaseConnection();
+        };
+
+        // Fetch latest data from Firestore Cloud to local
+        window.fetchLatestFromFirebase = async function() {
+            const btn = $('#btn-fetch-fb');
+            const originalText = btn.length ? btn.html() : '';
+            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Mengunduh...');
+            try {
+                const list = await window.firestoreSync.loadPegawaiList();
+                if (Array.isArray(list) && list.length > 0) {
+                    const normalized = list.map(p => typeof window.normalizePegawai === 'function' ? window.normalizePegawai(p) : p);
+                    if (typeof window.setDataPegawaiGlobal === 'function') {
+                        window.setDataPegawaiGlobal(normalized);
+                    } else {
+                        window.dataPegawai = normalized;
+                    }
+                    if (typeof window.refreshAllData === 'function') window.refreshAllData();
+                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                    if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                    if (typeof showToast === 'function') {
+                        showToast(`🔥 Berhasil menarik ${normalized.length} data pegawai terbaru dari Firebase Cloud Database!`, "success");
+                    }
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast("Data pegawai di Firestore masih kosong atau belum ada perubahan.", "info");
+                    }
+                }
+                if (btn.length) btn.prop('disabled', false).html(originalText);
+            } catch(err) {
+                if (btn.length) btn.prop('disabled', false).html(originalText);
+                if (typeof showToast === 'function') {
+                    showToast("Gagal menarik data dari Firebase: " + (err.message || err), "danger");
+                }
+            }
+        };
+
+        // Parse pasted snippet from Firebase Console
+        window.parseFirebaseSnippet = function(snippetText) {
+            if (!snippetText || !snippetText.trim()) return null;
+            const str = snippetText.trim();
+            const result = {};
+
+            const extractField = (fieldName) => {
+                const regex = new RegExp(`["']?${fieldName}["']?\\s*[:=]\\s*["'\`]([^"'\`]+)["'\`]`, 'i');
+                const match = str.match(regex);
+                return match ? match[1].trim() : null;
+            };
+
+            const apiKey = extractField('apiKey');
+            const projectId = extractField('projectId');
+            const authDomain = extractField('authDomain');
+            const storageBucket = extractField('storageBucket');
+            const messagingSenderId = extractField('messagingSenderId');
+            const appId = extractField('appId');
+            const firestoreDatabaseId = extractField('firestoreDatabaseId') || extractField('databaseId');
+
+            if (apiKey) result.apiKey = apiKey;
+            if (projectId) result.projectId = projectId;
+            if (authDomain) result.authDomain = authDomain;
+            if (storageBucket) result.storageBucket = storageBucket;
+            if (messagingSenderId) result.messagingSenderId = messagingSenderId;
+            if (appId) result.appId = appId;
+            if (firestoreDatabaseId) result.firestoreDatabaseId = firestoreDatabaseId;
+
+            return (result.apiKey || result.projectId) ? result : null;
+        };
+
+        // Multi-Platform code generator
+        window.generateMultiPlatformSnippet = function(platform) {
+            const cfg = window.activeFirebaseConfig || window.DEFAULT_FIREBASE_CONFIG;
+            if (platform === 'web') {
+                return `<!-- 1. Import Firebase JS SDK di HTML / Web App -->\n<script type="module">\n  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";\n  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";\n\n  const firebaseConfig = {\n    apiKey: "${cfg.apiKey}",\n    authDomain: "${cfg.authDomain}",\n    projectId: "${cfg.projectId}",\n    storageBucket: "${cfg.storageBucket}",\n    messagingSenderId: "${cfg.messagingSenderId}",\n    appId: "${cfg.appId}",\n    firestoreDatabaseId: "${cfg.firestoreDatabaseId}"\n  };\n\n  const app = initializeApp(firebaseConfig);\n  const db = getFirestore(app, "${cfg.firestoreDatabaseId}");\n\n  // Ambil Data Pegawai Real-time:\n  const querySnapshot = await getDocs(collection(db, "pegawai"));\n  querySnapshot.forEach((doc) => {\n    console.log(doc.id, "=>", doc.data());\n  });\n<` + `/script>`;
+            } else if (platform === 'android') {
+                return `// File: app/google-services.json\n{\n  "project_info": {\n    "project_number": "${cfg.messagingSenderId}",\n    "project_id": "${cfg.projectId}",\n    "storage_bucket": "${cfg.storageBucket}"\n  },\n  "client": [{\n    "client_info": {\n      "mobilesdk_app_id": "${cfg.appId}",\n      "android_client_info": {\n        "package_name": "com.simpeg.puskesmas"\n      }\n    },\n    "api_key": [{ "current_key": "${cfg.apiKey}" }]\n  }]\n}\n\n// Kode Android Kotlin (MainActivity.kt):\nval db = FirebaseFirestore.getInstance(FirebaseApp.getInstance(), "${cfg.firestoreDatabaseId}")\ndb.collection("pegawai").addSnapshotListener { snapshots, e ->\n    if (e != null) return@addSnapshotListener\n    for (doc in snapshots!!) {\n        Log.d("SIMPEG", "\${doc.id} => \${doc.data}")\n    }\n}`;
+            } else if (platform === 'ios') {
+                return `<!-- File: GoogleService-Info.plist -->\n<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n    <key>API_KEY</key>\n    <string>${cfg.apiKey}</string>\n    <key>GCM_SENDER_ID</key>\n    <string>${cfg.messagingSenderId}</string>\n    <key>PROJECT_ID</key>\n    <string>${cfg.projectId}</string>\n    <key>STORAGE_BUCKET</key>\n    <string>${cfg.storageBucket}</string>\n    <key>GOOGLE_APP_ID</key>\n    <string>${cfg.appId}</string>\n</dict>\n</plist>\n\n// Kode iOS Swift:\nimport FirebaseCore\nimport FirebaseFirestore\n\nFirebaseApp.configure()\nlet db = Firestore.firestore(database: "${cfg.firestoreDatabaseId}")\ndb.collection("pegawai").addSnapshotListener { querySnapshot, error in\n    guard let documents = querySnapshot?.documents else { return }\n    for doc in documents {\n        print("\\(doc.documentID) => \\(doc.data())")\n    }\n}`;
+            } else if (platform === 'flutter') {
+                return `// Flutter - lib/firebase_options.dart\nimport 'package:firebase_core/firebase_core.dart' show FirebaseOptions;\nimport 'package:cloud_firestore/cloud_firestore.dart';\n\nstatic const FirebaseOptions currentPlatform = FirebaseOptions(\n  apiKey: '${cfg.apiKey}',\n  appId: '${cfg.appId}',\n  messagingSenderId: '${cfg.messagingSenderId}',\n  projectId: '${cfg.projectId}',\n  storageBucket: '${cfg.storageBucket}',\n);\n\n// Mengakses Firestore Database di Flutter:\nfinal db = FirebaseFirestore.instanceFor(\n  app: Firebase.app(),\n  databaseId: '${cfg.firestoreDatabaseId}',\n);\n\ndb.collection('pegawai').snapshots().listen((snapshot) {\n  for (var doc in snapshot.docs) {\n    print('\${doc.id} => \${doc.data()}');\n  }\n});`;
+            } else if (platform === 'react_native') {
+                return `// React Native / Expo:\nimport { initializeApp } from 'firebase/app';\nimport { getFirestore, collection, onSnapshot } from 'firebase/firestore';\n\nconst firebaseConfig = {\n  apiKey: "${cfg.apiKey}",\n  authDomain: "${cfg.authDomain}",\n  projectId: "${cfg.projectId}",\n  storageBucket: "${cfg.storageBucket}",\n  messagingSenderId: "${cfg.messagingSenderId}",\n  appId: "${cfg.appId}",\n  firestoreDatabaseId: "${cfg.firestoreDatabaseId}"\n};\n\nconst app = initializeApp(firebaseConfig);\nconst db = getFirestore(app, "${cfg.firestoreDatabaseId}");\n\nonSnapshot(collection(db, "pegawai"), (snapshot) => {\n  const list = snapshot.docs.map(doc => doc.data());\n  console.log("Daftar Pegawai:", list);\n});`;
+            } else if (platform === 'rest_api') {
+                return `# Endpoint REST API Resmi Firebase Firestore:\nGET https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${cfg.firestoreDatabaseId}/documents/pegawai?key=${cfg.apiKey}\n\n# Contoh cURL Terminal / Backend (PHP / Python / Node.js / WhatsApp Bot):\ncurl -X GET "https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${cfg.firestoreDatabaseId}/documents/pegawai?key=${cfg.apiKey}"\n\n# Header Respons: JSON Object berisi seluruh dokumen pegawai.`;
+            }
+            return JSON.stringify(cfg, null, 2);
+        };
+
+        window.copyMultiPlatformSnippet = function(platform) {
+            const code = window.generateMultiPlatformSnippet(platform);
+            navigator.clipboard.writeText(code).then(() => {
+                if (typeof showToast === 'function') {
+                    showToast(`📋 Kode koneksi ${platform.toUpperCase()} berhasil disalin ke clipboard!`, "success");
+                }
+            }).catch(() => {
+                if (typeof showToast === 'function') {
+                    showToast("Gagal menyalin, silakan blok teks dan salin manual.", "warning");
+                }
+            });
+        };
+
+        // Initial connection test
+        window.testFirebaseConnectionDetails();
 
         // Firebase Google Auth Handler
         window.loginWithFirebaseGoogle = async function() {
@@ -327,7 +583,7 @@
             }
         });
 
-        console.log("🔥 Firebase initialized with Firestore database ID:", firebaseConfig.firestoreDatabaseId);
+        console.log("🔥 Firebase initialized with Firestore database ID:", activeFirebaseConfig.firestoreDatabaseId);
     </script>
 
     <style>
@@ -917,6 +1173,9 @@
                     <span class="d-inline d-sm-none">SIMPEG PKSS</span>
                 </span>
                 <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-bold d-none d-md-inline-flex align-items-center" id="global-db-badge-public">
+                        <i class="fas fa-check-circle me-1"></i> Database Terhubung
+                    </span>
                     <button class="btn btn-light text-primary fw-bold rounded-pill px-4 shadow-sm" onclick="window.showLoginScreen()">
                         <i class="fas fa-sign-in-alt me-1"></i> Login
                     </button>
@@ -1090,6 +1349,9 @@
                 <div class="container-fluid">
                     <span class="navbar-brand mb-0 h5 fw-bold text-dark" id="page-title">Dashboard</span>
                     <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm" id="global-db-badge-app" style="cursor: pointer; transition: all 0.2s;" title="Klik untuk membuka Pengaturan & Konfigurasi Database Firebase" onclick="window.openFirebaseConfig()">
+                            <i class="fas fa-database text-success me-1"></i> Database Terkoneksi (<span id="global-db-pegawai-count">16 Pegawai</span>)
+                        </span>
                         <button class="btn bg-light text-primary btn-sm me-1 rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS()"><i class="fas fa-sync-alt me-1"></i> Segarkan Data</button>
                         <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold px-3" onclick="window.showSection('pengaturan')"><i class="fas fa-cog me-1"></i> Pengaturan</button>
                         <span class="ms-2 me-1 fw-bold text-secondary" id="user-display-name"><i class="fas fa-user-circle fs-5 me-2 align-middle text-primary"></i> Memuat...</span>
@@ -4134,6 +4396,246 @@
             <section id="pengaturan" class="page-section">
                 <div class="row g-4">
                     <div class="col-lg-8 col-md-10 mx-auto">
+                        <!-- Card Konfigurasi Firebase Cloud Firestore Multi-Platform -->
+                        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4" id="card-firebase-config">
+                            <div class="card-header text-white border-0 py-3 px-4 d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 50%, #FFA000 100%);">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="bg-white bg-opacity-25 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                        <i class="fas fa-fire fs-4 text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-0 fw-bold">Konfigurasi Database Firebase (Multi-Platform)</h5>
+                                        <small class="text-white text-opacity-90">Sinkronisasi Real-time Otomatis di Semua Peramban, Web, Android, iOS, & Flutter</small>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold shadow-sm" id="fb-connection-badge">
+                                        <i class="fas fa-check-circle text-success me-1"></i> Terhubung & Siap
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body p-4 bg-white">
+                                <!-- Status Ringkasan Cloud Firestore -->
+                                <div class="p-3 rounded-4 mb-4" style="background: #FFF9F2; border: 1px solid #FFE0B2;">
+                                    <div class="row g-3 text-center text-md-start align-items-center">
+                                        <div class="col-md-3 col-6">
+                                            <div class="text-muted small fw-semibold">Status Cloud Database</div>
+                                            <div class="fw-bold text-success d-flex align-items-center justify-content-center justify-content-md-start gap-1">
+                                                <i class="fas fa-signal"></i> Real-time Online
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 col-6">
+                                            <div class="text-muted small fw-semibold">Database ID</div>
+                                            <div class="fw-bold text-dark text-truncate" title="ai-studio-remixsimpegdigit-c782e847-da5f-44ea-80c8-c48de7bfa72b" id="fb-db-display">
+                                                ai-studio-remixsimpeg...
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3 col-6">
+                                            <div class="text-muted small fw-semibold">Project ID</div>
+                                            <div class="fw-bold text-primary text-truncate" id="fb-proj-display">
+                                                graphical-marking-lxctm
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2 col-6 text-md-end">
+                                            <div class="text-muted small fw-semibold">Latensi / Ping</div>
+                                            <div class="fw-bold text-secondary" id="fb-latency-val">
+                                                ~95 ms
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Box Diagnostik Cerdas Masalah Koneksi Firebase -->
+                                <div id="fb-diagnostic-alert" class="alert alert-danger border-0 rounded-4 shadow-sm p-4 mb-4 d-none">
+                                    <div class="d-flex align-items-start gap-3">
+                                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                                            <i class="fas fa-exclamation-triangle fs-4"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="fw-bold text-danger mb-1" id="fb-diag-title">Koneksi Firebase Tidak Berhasil</h6>
+                                            <div class="small text-danger bg-white bg-opacity-75 p-2 rounded border border-danger border-opacity-25 font-monospace mb-2" id="fb-diag-error-raw"></div>
+                                            <div id="fb-diag-explanation" class="small mb-3 text-dark"></div>
+                                            <div class="d-flex flex-wrap gap-2" id="fb-diag-actions"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Action Toolbar: Uji Koneksi & Sinkronisasi -->
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-4 pb-3 border-bottom">
+                                    <button type="button" class="btn btn-warning text-dark fw-bold rounded-pill px-3 shadow-sm" id="btn-test-fb" onclick="window.testFirebaseConnectionDetails()">
+                                        <i class="fas fa-bolt me-1"></i> Uji Koneksi & Latensi
+                                    </button>
+                                    <button type="button" class="btn btn-primary fw-bold rounded-pill px-3 shadow-sm" id="btn-sync-all-fb" onclick="window.syncAllSimpegToFirebase()">
+                                        <i class="fas fa-cloud-upload-alt me-1"></i> Sinkronkan Semua Data SIMPEG ke Firebase
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success fw-bold rounded-pill px-3 shadow-sm" id="btn-fetch-fb" onclick="window.fetchLatestFromFirebase()">
+                                        <i class="fas fa-cloud-download-alt me-1"></i> Tarik Data dari Cloud
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3 fw-semibold ms-auto" onclick="window.copyFirebaseConfigJson()">
+                                        <i class="fas fa-copy me-1"></i> Salin JSON
+                                    </button>
+                                </div>
+
+                                <!-- TAB NAV: 1. Setup Sangat Mudah, 2. Panduan Lintas Platform -->
+                                <ul class="nav nav-pills nav-fill mb-3 p-1 bg-light rounded-pill border" id="pills-fb-tabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active rounded-pill fw-bold py-2" id="pills-fb-easy-tab" data-bs-toggle="pill" data-bs-target="#pills-fb-easy" type="button" role="tab">
+                                            <i class="fas fa-magic text-warning me-1"></i> Mode Sangat Gampang (Tempel / Deteksi)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link rounded-pill fw-bold py-2" id="pills-fb-multi-tab" data-bs-toggle="pill" data-bs-target="#pills-fb-multi" type="button" role="tab">
+                                            <i class="fas fa-laptop-code text-primary me-1"></i> Hub Koneksi Lintas Platform (Android, iOS, Web, Flutter)
+                                        </button>
+                                    </li>
+                                </ul>
+
+                                <div class="tab-content" id="pills-fb-tabContent">
+                                    <!-- TAB 1: Mode Sangat Mudah -->
+                                    <div class="tab-pane fade show active" id="pills-fb-easy" role="tabpanel">
+                                        <div class="alert alert-light border rounded-3 p-3 mb-3">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <i class="fas fa-info-circle text-primary fs-5 mt-1"></i>
+                                                <div class="small">
+                                                    <strong>Sangat Mudah:</strong> Database Firebase default resmi sudah langsung aktif dan terhubung. Jika Anda ingin menggunakan Firebase Project milik instansi Anda sendiri, cukup <strong>tempel (paste) kode snippet dari Firebase Console</strong> di bawah, lalu klik <strong>Terapkan Otomatis</strong>!
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold text-dark">
+                                                <i class="fas fa-paste text-warning me-1"></i> Tempel Snippet Konfigurasi Firebase (JS atau JSON)
+                                            </label>
+                                            <textarea class="form-control font-monospace small" id="fb_snippet_paste" rows="4" placeholder='Contoh: const firebaseConfig = { apiKey: "AIzaSy...", projectId: "my-simpeg-project", ... };'></textarea>
+                                        </div>
+
+                                        <div class="d-flex flex-wrap gap-2 mb-3">
+                                            <button type="button" class="btn btn-warning text-dark fw-bold rounded-pill px-4" onclick="window.applyPastedFirebaseSnippet()">
+                                                <i class="fas fa-check-circle me-1"></i> Deteksi & Terapkan Otomatis
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger fw-bold rounded-pill px-3" onclick="window.resetFirebaseConfigToDefault()">
+                                                <i class="fas fa-undo me-1"></i> Pulihkan ke Default Cloud
+                                            </button>
+                                            <button type="button" class="btn btn-link text-decoration-none text-muted small ms-auto" data-bs-toggle="collapse" data-bs-target="#collapseManualFirebase">
+                                                <i class="fas fa-sliders-h me-1"></i> Pengaturan Parameter Manual
+                                            </button>
+                                        </div>
+
+                                        <!-- Form Manual Collapse -->
+                                        <div class="collapse border rounded-3 p-3 bg-light" id="collapseManualFirebase">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="fas fa-edit me-1"></i> Edit Parameter Firebase Spesifik</h6>
+                                            <div class="row g-2">
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Project ID</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_projectId" placeholder="graphical-marking-lxctm">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Database ID (Firestore)</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_databaseId" placeholder="ai-studio-remixsimpegdigit-...">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">API Key</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_apiKey" placeholder="AIzaSy...">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Auth Domain</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_authDomain" placeholder="project.firebaseapp.com">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Storage Bucket</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_storageBucket" placeholder="project.firebasestorage.app">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Messaging Sender ID</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_messagingSenderId" placeholder="1098525805857">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label small fw-semibold">App ID</label>
+                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_appId" placeholder="1:1098525805857:web:...">
+                                                </div>
+                                            </div>
+                                            <div class="mt-3 text-end">
+                                                <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold px-3" onclick="window.applyManualFirebaseConfig()">
+                                                    <i class="fas fa-save me-1"></i> Simpan Parameter Manual
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- TAB 2: Hub Koneksi Lintas Platform -->
+                                    <div class="tab-pane fade" id="pills-fb-multi" role="tabpanel">
+                                        <div class="alert alert-primary border-0 rounded-3 p-3 mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="fas fa-globe text-primary fs-4"></i>
+                                                <div>
+                                                    <strong class="d-block">Koneksikan ke Segala Jenis Platform & Aplikasi</strong>
+                                                    <span class="small text-muted">Gunakan konfigurasi di bawah untuk menghubungkan aplikasi Android, iOS, Website lain, Flutter, atau bot otomatis ke SIMPEG ini secara real-time.</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Platform Selector Buttons -->
+                                        <div class="btn-group w-100 mb-3 flex-wrap shadow-sm" role="group" id="platform-btn-group">
+                                            <button type="button" class="btn btn-outline-primary active fw-bold py-2" onclick="window.selectPlatformCode('web', this)">
+                                                <i class="fas fa-globe me-1"></i> Web / PWA
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('android', this)">
+                                                <i class="fab fa-android me-1"></i> Android
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('ios', this)">
+                                                <i class="fab fa-apple me-1"></i> iOS (Swift)
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('flutter', this)">
+                                                <i class="fas fa-mobile-alt me-1"></i> Flutter
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('react_native', this)">
+                                                <i class="fab fa-react me-1"></i> React Native
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('rest_api', this)">
+                                                <i class="fas fa-network-wired me-1"></i> REST API / cURL
+                                            </button>
+                                        </div>
+
+                                        <!-- Code Display Box with Copy Button -->
+                                        <div class="position-relative mb-3">
+                                            <div class="d-flex justify-content-between align-items-center bg-dark text-white px-3 py-2 rounded-top font-monospace small">
+                                                <span id="platform-code-title"><i class="fas fa-code me-1 text-warning"></i> Snippet Kode Web / PWA</span>
+                                                <button type="button" class="btn btn-warning btn-sm fw-bold rounded-pill px-3 py-1" onclick="window.copyActivePlatformCode()">
+                                                    <i class="fas fa-copy me-1"></i> Salin Kode Integrasi
+                                                </button>
+                                            </div>
+                                            <pre class="bg-dark text-white p-3 rounded-bottom mb-0 small" style="max-height: 280px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace;"><code id="platform-code-content"></code></pre>
+                                        </div>
+
+                                        <!-- Cara Kerja 3 Langkah -->
+                                        <div class="row g-2 text-center text-md-start small text-muted">
+                                            <div class="col-md-4">
+                                                <div class="p-2 border rounded-3 bg-light">
+                                                    <span class="badge bg-primary rounded-circle mb-1">1</span>
+                                                    <div class="fw-bold text-dark">Salin Konfigurasi</div>
+                                                    <div>Tempel kode di atas ke aplikasi target Anda.</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="p-2 border rounded-3 bg-light">
+                                                    <span class="badge bg-primary rounded-circle mb-1">2</span>
+                                                    <div class="fw-bold text-dark">Akses Koleksi</div>
+                                                    <div>Gunakan koleksi <code>pegawai</code>, <code>usulan</code>, atau <code>jadwal_diklat</code>.</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="p-2 border rounded-3 bg-light">
+                                                    <span class="badge bg-primary rounded-circle mb-1">3</span>
+                                                    <div class="fw-bold text-dark">Real-Time Sync</div>
+                                                    <div>Data langsung sinkron tanpa perlu perantara server tambahan.</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Card Utama Preferensi & Anti-Reset -->
                         <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
                             <div class="card-header bg-primary bg-gradient text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between">
@@ -8952,8 +9454,30 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
     <script src="https://cdn.jsdelivr.net/npm/pivottable@2.27.0/dist/pivot.min.js"></script>
 
     <script>
-        let activeUser = null;
-        let dataPegawai = [];
+        var activeUser = window.activeUser || null;
+        var dataPegawai = Array.isArray(window.dataPegawai) ? window.dataPegawai : [];
+        window.dataPegawai = dataPegawai;
+        window.activeUser = activeUser;
+
+        window.setDataPegawaiGlobal = function(val) {
+            const arr = Array.isArray(val) ? val : [];
+            dataPegawai = arr;
+            window.dataPegawai = arr;
+            try {
+                localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(arr));
+            } catch(e){}
+            if ($('#global-db-pegawai-count').length) {
+                $('#global-db-pegawai-count').text(`${arr.length} Pegawai`);
+            }
+            if ($('#global-db-badge-public').length) {
+                $('#global-db-badge-public').html(`<i class="fas fa-check-circle text-success me-1"></i> Database Terhubung (${arr.length} Pegawai)`);
+            }
+            return arr;
+        };
+
+        window.getDataPegawaiGlobal = function() {
+            return (Array.isArray(window.dataPegawai) && window.dataPegawai.length > 0) ? window.dataPegawai : (Array.isArray(dataPegawai) ? dataPegawai : []);
+        };
         let tableMasterRef, tableLaporanRef;
         let charts = {}; let pubCharts = {};
 
@@ -9841,19 +10365,15 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.getApiEndpoint = function(action) {
-            let isNode = (window.location.port === "3000" || window.location.hostname === "localhost" || window.location.hostname.includes("run.app"));
             if (action === 'getAllAppModules' || action === 'getAppConfig' || action === 'getAllData') {
-                return isNode ? ('/api/gas?action=' + encodeURIComponent(action)) : ('api.php?action=' + encodeURIComponent(action));
+                return '/api/gas?action=' + encodeURIComponent(action);
             }
-            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url');
+            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url') || window.remoteGasWebappUrl;
             if (customGasUrl && customGasUrl.trim().startsWith('http')) {
                 let cleanUrl = customGasUrl.trim();
                 return action ? (cleanUrl + (cleanUrl.includes('?') ? '&' : '?') + 'action=' + encodeURIComponent(action)) : cleanUrl;
             }
-            if (isNode) {
-                return action ? '/api/gas?action=' + encodeURIComponent(action) : '/api/gas';
-            }
-            return action ? 'api.php?action=' + encodeURIComponent(action) : 'api.php';
+            return action ? '/api/gas?action=' + encodeURIComponent(action) : '/api/gas';
         };
 
         window.postToBackend = async function(action, payload) {
@@ -9869,7 +10389,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 }
             }
 
-            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url');
+            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url') || window.remoteGasWebappUrl;
             let isGas = customGasUrl && customGasUrl.trim().startsWith('http') && action !== 'getAllAppModules' && action !== 'getAppConfig' && action !== 'saveAppConfig';
 
             if (isGas) {
@@ -9896,10 +10416,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         async function postToServerEndpoint(action, payload) {
-            // Fallback to local server or api.php
-            let endpoint = (window.location.port === "3000" || window.location.hostname === "localhost" || window.location.hostname.includes("run.app"))
-                ? ('/api/gas?action=' + encodeURIComponent(action))
-                : ('api.php?action=' + encodeURIComponent(action));
+            let endpoint = '/api/gas?action=' + encodeURIComponent(action);
 
             try {
                 let r = await fetch(endpoint, {
@@ -10047,10 +10564,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
 
                     if (filtered.length > 0) {
                         const normalized = filtered.map(p => window.normalizePegawai(p));
-                        dataPegawai = normalized;
-                        try {
-                            localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
-                        } catch(e){}
+                        window.setDataPegawaiGlobal(normalized);
 
                         // Persist to Cloud Firestore so all other computers/browsers receive it!
                         if (window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
@@ -10084,6 +10598,9 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         if (typeof window.updatePersistenceUiStats === 'function') {
                             window.updatePersistenceUiStats();
                         }
+                        if (typeof window.updatePublicDashboard === 'function') {
+                            window.updatePublicDashboard();
+                        }
                         $('#loadingOverlay').hide();
                         showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari ${sourceLabel}!`, "success");
                         return;
@@ -10091,60 +10608,65 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 }
 
                 // If server data was empty or invalid, try Firestore Cloud Database directly
-                if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
-                    window.firestoreSync.loadPegawaiList().then(fsList => {
-                        if (Array.isArray(fsList) && fsList.length > 0) {
-                            const normalized = fsList.map(p => window.normalizePegawai(p));
-                            dataPegawai = normalized;
-                            try { localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai)); } catch(e){}
-                            refreshAllData();
-                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                            $('#loadingOverlay').hide();
-                            showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari Cloud Database Firestore!`, "success");
-                        } else if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
-                            dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
-                            refreshAllData();
-                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                            $('#loadingOverlay').hide();
-                            showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
-                        } else {
-                            dataPegawai = [];
-                            refreshAllData();
-                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                            $('#loadingOverlay').hide();
-                            showToast("Data pegawai belum tersedia.", "info");
-                        }
-                    }).catch(() => {
-                        if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
-                            dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
-                            refreshAllData();
-                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                            $('#loadingOverlay').hide();
-                            showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
-                        }
-                    });
-                    return;
-                }
+                const tryFirestore = () => {
+                    if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
+                        return window.firestoreSync.loadPegawaiList().then(fsList => {
+                            if (Array.isArray(fsList) && fsList.length > 0) {
+                                const normalized = fsList.map(p => window.normalizePegawai(p));
+                                window.setDataPegawaiGlobal(normalized);
+                                refreshAllData();
+                                if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                                if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                                $('#loadingOverlay').hide();
+                                showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari Cloud Database Firestore!`, "success");
+                                return true;
+                            }
+                            return false;
+                        }).catch(() => false);
+                    }
+                    return Promise.resolve(false);
+                };
 
-                if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
-                    dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
-                    localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
-                    refreshAllData();
-                    if (typeof window.updatePersistenceUiStats === 'function') {
-                        window.updatePersistenceUiStats();
+                tryFirestore().then(fsSuccess => {
+                    if (fsSuccess) return;
+
+                    if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
+                        const normalized = localPegawai.map(p => window.normalizePegawai(p));
+                        window.setDataPegawaiGlobal(normalized);
+                        refreshAllData();
+                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                        if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                        $('#loadingOverlay').hide();
+                        showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
+                    } else {
+                        // Fallback to static data_pegawai_db.json
+                        fetch('data_pegawai_db.json')
+                            .then(r => r.ok ? r.json() : Promise.reject())
+                            .then(jsonRes => {
+                                const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
+                                if (list.length > 0) {
+                                    const normalized = list.map(p => window.normalizePegawai(p));
+                                    window.setDataPegawaiGlobal(normalized);
+                                    refreshAllData();
+                                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                                    if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                                    $('#loadingOverlay').hide();
+                                    showToast(`Memuat ${dataPegawai.length} data pegawai dari Database Cadangan.`, "info");
+                                } else {
+                                    window.setDataPegawaiGlobal([]);
+                                    refreshAllData();
+                                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                                    $('#loadingOverlay').hide();
+                                }
+                            })
+                            .catch(() => {
+                                window.setDataPegawaiGlobal([]);
+                                refreshAllData();
+                                if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                                $('#loadingOverlay').hide();
+                            });
                     }
-                    $('#loadingOverlay').hide();
-                    showToast(`Memuat ${dataPegawai.length} data pegawai dari penyimpanan lokal.`, "info");
-                } else {
-                    dataPegawai = [];
-                    localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
-                    refreshAllData();
-                    if (typeof window.updatePersistenceUiStats === 'function') {
-                        window.updatePersistenceUiStats();
-                    }
-                    $('#loadingOverlay').hide();
-                    showToast("Data pegawai belum tersedia.", "info");
-                }
+                });
             };
 
             let bundleEndpoint = window.getApiEndpoint('getAllAppModules');
@@ -10157,12 +10679,13 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         // Auto-detect and sync GAS URL if set on server
                         if (d.config && (d.config.gas_webapp_url || d.config.gas_url)) {
                             const remoteGas = (d.config.gas_webapp_url || d.config.gas_url).trim();
-                            const currentGas = (localStorage.getItem('simpeg_gas_webapp_url') || '').trim();
-                            if (remoteGas && remoteGas !== currentGas) {
+                            if (remoteGas && remoteGas.startsWith('http')) {
                                 console.log("🔥 Auto-detected centralized GAS URL from server:", remoteGas);
                                 localStorage.setItem('simpeg_gas_webapp_url', remoteGas);
+                                window.remoteGasWebappUrl = remoteGas;
                                 if ($('#set_gas_webapp_url').length) $('#set_gas_webapp_url').val(remoteGas);
                                 $('#badgeGasStatus').removeClass('bg-warning bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
+                                $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-link me-1"></i> Terkoneksi Otomatis: ${remoteGas.substring(0, 45)}...</span>`);
                             }
                         }
                         if (d.diklat && Array.isArray(d.diklat) && d.diklat.length > 0) {
@@ -10195,62 +10718,78 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 })
                 .catch(() => {
                     // Try Firestore directly
-                    if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
-                        window.firestoreSync.loadPegawaiList().then(fsList => {
-                            if (Array.isArray(fsList) && fsList.length > 0) {
-                                applyPegawaiData(fsList, "Cloud Database Firestore");
-                                return;
+                    const waitForFirestoreAndLoad = () => {
+                        let attempts = 0;
+                        const check = () => {
+                            if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
+                                window.firestoreSync.loadPegawaiList().then(fsList => {
+                                    if (Array.isArray(fsList) && fsList.length > 0) {
+                                        applyPegawaiData(fsList, "Cloud Database Firestore");
+                                        return;
+                                    }
+                                    fetchFromGasDirect();
+                                }).catch(() => {
+                                    fetchFromGasDirect();
+                                });
+                            } else if (attempts < 15) {
+                                attempts++;
+                                setTimeout(check, 150);
+                            } else {
+                                fetchFromGasDirect();
                             }
-                            fetchFromGasDirect();
-                        }).catch(() => {
-                            fetchFromGasDirect();
-                        });
-                    } else {
-                        fetchFromGasDirect();
-                    }
+                        };
+                        check();
+                    };
+                    waitForFirestoreAndLoad();
                 });
 
             function fetchFromGasDirect() {
-                let primaryEndpoint = window.getApiEndpoint('getPegawaiData');
+                let customGas = localStorage.getItem('simpeg_gas_webapp_url') || window.remoteGasWebappUrl;
+                if (customGas && customGas.startsWith('http')) {
+                    fetch(window.getApiEndpoint('getPegawaiData'))
+                        .then(res => res.ok ? res.json() : Promise.reject())
+                        .then(data => {
+                            const list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+                            if (list.length > 0) {
+                                applyPegawaiData(list, "Google Spreadsheet");
+                                return;
+                            }
+                            tryFallbackChain();
+                        })
+                        .catch(() => tryFallbackChain());
+                } else {
+                    tryFallbackChain();
+                }
 
-                fetch(primaryEndpoint)
-                    .then(res => {
-                        if (!res.ok) throw new Error("HTTP " + res.status);
-                        return res.json();
-                    })
-                    .then(data => {
-                        const list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
-                        applyPegawaiData(list, "Google Spreadsheet");
-                    })
-                    .catch(err => {
-                        fetch('api.php?action=getPegawaiData')
-                            .then(r => r.ok ? r.json() : Promise.reject())
-                            .then(dataPhp => {
-                                applyPegawaiData(dataPhp, "Database Server");
-                            })
-                            .catch(errPhp => {
-                                if (localPegawai && localPegawai.length > 0) {
-                                    dataPegawai = localPegawai.map(p => window.normalizePegawai(p));
-                                    refreshAllData();
-                                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                    $('#loadingOverlay').hide();
-                                    showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
-                                    return;
-                                }
+                function tryFallbackChain() {
+                    fetch('data_pegawai_db.json')
+                        .then(r => r.ok ? r.json() : Promise.reject())
+                        .then(jsonRes => {
+                            const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
+                            if (list.length > 0) {
+                                applyPegawaiData(list, "Database JSON");
+                            } else {
+                                applyLocalCache();
+                            }
+                        })
+                        .catch(() => applyLocalCache());
+                }
 
-                                fetch('data_pegawai_db.json')
-                                    .then(r => r.ok ? r.json() : Promise.reject())
-                                    .then(jsonRes => {
-                                        applyPegawaiData(Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []), "Database JSON");
-                                    })
-                                    .catch(e2 => {
-                                        $('#loadingOverlay').hide();
-                                        refreshAllData();
-                                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                        showToast("Memuat data kepegawaian bawaan.", "info");
-                                    });
-                            });
-                    });
+                function applyLocalCache() {
+                    if (localPegawai && localPegawai.length > 0) {
+                        const normalized = localPegawai.map(p => window.normalizePegawai(p));
+                        window.setDataPegawaiGlobal(normalized);
+                        refreshAllData();
+                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                        if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                        $('#loadingOverlay').hide();
+                        showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
+                    } else {
+                        $('#loadingOverlay').hide();
+                        refreshAllData();
+                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                    }
+                }
             }
         };
 
@@ -27455,6 +27994,257 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             $('#modalQRScanner').on('hidden.bs.modal', function () {
                 window.stopQRCameraScanner();
             });
+
+            // --- FIREBASE MULTI-PLATFORM SETUP HANDLERS ---
+            window.activeSelectedPlatform = 'web';
+
+            window.openFirebaseConfig = function() {
+                if (typeof window.showSection === 'function') {
+                    window.showSection('pengaturan');
+                }
+                setTimeout(() => {
+                    const card = document.getElementById('card-firebase-config');
+                    if (card) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        card.classList.add('border', 'border-warning', 'shadow-lg');
+                        setTimeout(() => card.classList.remove('border-warning', 'shadow-lg'), 2000);
+                    }
+                }, 180);
+            };
+
+            window.populateFirebaseUiFields = function() {
+                const cfg = window.activeFirebaseConfig || window.DEFAULT_FIREBASE_CONFIG;
+                if (!cfg) return;
+                $('#cfg_fb_projectId').val(cfg.projectId || '');
+                $('#cfg_fb_databaseId').val(cfg.firestoreDatabaseId || '');
+                $('#cfg_fb_apiKey').val(cfg.apiKey || '');
+                $('#cfg_fb_authDomain').val(cfg.authDomain || '');
+                $('#cfg_fb_storageBucket').val(cfg.storageBucket || '');
+                $('#cfg_fb_messagingSenderId').val(cfg.messagingSenderId || '');
+                $('#cfg_fb_appId').val(cfg.appId || '');
+
+                $('#fb-proj-display').text(cfg.projectId || '-');
+                if (cfg.firestoreDatabaseId) {
+                    const dbShort = cfg.firestoreDatabaseId.length > 22 ? cfg.firestoreDatabaseId.substring(0, 20) + '...' : cfg.firestoreDatabaseId;
+                    $('#fb-db-display').text(dbShort).attr('title', cfg.firestoreDatabaseId);
+                }
+
+                window.selectPlatformCode(window.activeSelectedPlatform || 'web');
+            };
+
+            window.selectPlatformCode = function(platform, btnEl) {
+                window.activeSelectedPlatform = platform;
+                if (btnEl) {
+                    $('#platform-btn-group button').removeClass('active');
+                    $(btnEl).addClass('active');
+                }
+                const titles = {
+                    web: '<i class="fas fa-globe me-1 text-warning"></i> Snippet Kode Web / Website / PWA',
+                    android: '<i class="fab fa-android me-1 text-success"></i> Snippet Kode Android (Kotlin & google-services.json)',
+                    ios: '<i class="fab fa-apple me-1 text-light"></i> Snippet Kode iOS (Swift & GoogleService-Info.plist)',
+                    flutter: '<i class="fas fa-mobile-alt me-1 text-info"></i> Snippet Kode Flutter (Dart)',
+                    react_native: '<i class="fab fa-react me-1 text-info"></i> Snippet Kode React Native / Expo',
+                    rest_api: '<i class="fas fa-network-wired me-1 text-warning"></i> REST API Firestore (cURL / Backend / WhatsApp Bot)'
+                };
+                $('#platform-code-title').html(titles[platform] || 'Snippet Integrasi');
+                if (typeof window.generateMultiPlatformSnippet === 'function') {
+                    $('#platform-code-content').text(window.generateMultiPlatformSnippet(platform));
+                }
+            };
+
+            window.copyActivePlatformCode = function() {
+                if (typeof window.copyMultiPlatformSnippet === 'function') {
+                    window.copyMultiPlatformSnippet(window.activeSelectedPlatform || 'web');
+                }
+            };
+
+            window.copyFirebaseConfigJson = function() {
+                const cfg = window.activeFirebaseConfig || window.DEFAULT_FIREBASE_CONFIG;
+                const jsonStr = JSON.stringify(cfg, null, 2);
+                navigator.clipboard.writeText(jsonStr).then(() => {
+                    if (typeof showToast === 'function') {
+                        showToast("📋 Konfigurasi JSON Firebase berhasil disalin ke clipboard!", "success");
+                    }
+                }).catch(() => {
+                    if (typeof showToast === 'function') {
+                        showToast("Gagal menyalin konfigurasi JSON.", "warning");
+                    }
+                });
+            };
+
+            window.applyPastedFirebaseSnippet = function() {
+                const snippet = $('#fb_snippet_paste').val();
+                if (!snippet || !snippet.trim()) {
+                    if (typeof showToast === 'function') showToast("Silakan tempel snippet Firebase Console terlebih dahulu.", "warning");
+                    return;
+                }
+                const parsed = window.parseFirebaseSnippet ? window.parseFirebaseSnippet(snippet) : null;
+                if (!parsed || (!parsed.apiKey && !parsed.projectId)) {
+                    if (typeof showToast === 'function') showToast("Format snippet tidak dikenali. Pastikan berisi apiKey dan projectId.", "danger");
+                    return;
+                }
+
+                // If user enters a custom project, standard Firestore database is '(default)'
+                if (!parsed.firestoreDatabaseId || parsed.firestoreDatabaseId === window.DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId) {
+                    if (parsed.projectId !== window.DEFAULT_FIREBASE_CONFIG.projectId) {
+                        parsed.firestoreDatabaseId = '(default)';
+                    } else {
+                        parsed.firestoreDatabaseId = window.DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId;
+                    }
+                }
+
+                localStorage.setItem('simpeg_custom_firebase_config', JSON.stringify(parsed));
+                if (typeof showToast === 'function') {
+                    showToast("✨ Konfigurasi Firebase berhasil dideteksi dan disimpan! Menghubungkan ulang...", "success");
+                }
+                setTimeout(() => window.location.reload(), 900);
+            };
+
+            window.applyManualFirebaseConfig = function() {
+                const projectId = $('#cfg_fb_projectId').val().trim();
+                let databaseId = $('#cfg_fb_databaseId').val().trim();
+                const apiKey = $('#cfg_fb_apiKey').val().trim();
+                const authDomain = $('#cfg_fb_authDomain').val().trim();
+                const storageBucket = $('#cfg_fb_storageBucket').val().trim();
+                const messagingSenderId = $('#cfg_fb_messagingSenderId').val().trim();
+                const appId = $('#cfg_fb_appId').val().trim();
+
+                if (!projectId || !apiKey) {
+                    if (typeof showToast === 'function') showToast("Project ID dan API Key wajib diisi.", "danger");
+                    return;
+                }
+
+                if (!databaseId) {
+                    databaseId = (projectId === window.DEFAULT_FIREBASE_CONFIG.projectId)
+                        ? window.DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId
+                        : '(default)';
+                }
+
+                const customConfig = {
+                    projectId,
+                    firestoreDatabaseId: databaseId,
+                    apiKey,
+                    authDomain,
+                    storageBucket,
+                    messagingSenderId,
+                    appId
+                };
+
+                localStorage.setItem('simpeg_custom_firebase_config', JSON.stringify(customConfig));
+                if (typeof showToast === 'function') {
+                    showToast("💾 Konfigurasi Firebase berhasil disimpan! Menghubungkan ulang...", "success");
+                }
+                setTimeout(() => window.location.reload(), 900);
+            };
+
+            window.fixDatabaseIdToDefault = function() {
+                let saved = {};
+                try {
+                    saved = JSON.parse(localStorage.getItem('simpeg_custom_firebase_config') || '{}');
+                } catch(e){}
+                saved.firestoreDatabaseId = '(default)';
+                localStorage.setItem('simpeg_custom_firebase_config', JSON.stringify(saved));
+                if (typeof showToast === 'function') {
+                    showToast("🛠️ Database ID berhasil diubah ke '(default)'. Menghubungkan ulang...", "success");
+                }
+                setTimeout(() => window.location.reload(), 700);
+            };
+
+            window.renderFirebaseDiagnostic = function(errCode, errMsg) {
+                const alertEl = $('#fb-diagnostic-alert');
+                const titleEl = $('#fb-diag-title');
+                const rawEl = $('#fb-diag-error-raw');
+                const expEl = $('#fb-diag-explanation');
+                const actEl = $('#fb-diag-actions');
+
+                if (!alertEl.length) return;
+                alertEl.removeClass('d-none');
+                rawEl.text(errMsg || errCode || 'Unknown Firestore Error');
+
+                const lowerMsg = (errMsg + ' ' + errCode).toLowerCase();
+                const isPermission = lowerMsg.includes('permission') || lowerMsg.includes('insufficient') || lowerMsg.includes('rules');
+                const isNotFound = lowerMsg.includes('not-found') || lowerMsg.includes('not found') || lowerMsg.includes('does not exist') || errMsg.includes('ai-studio-remixsimpegdigit');
+                const isApiKey = lowerMsg.includes('api-key') || lowerMsg.includes('invalid-api-key') || lowerMsg.includes('auth/api-key-not-valid');
+
+                if (isPermission) {
+                    titleEl.html('<i class="fas fa-shield-alt text-danger me-1"></i> Aturan Keamanan (Rules) Menolak Akses (Permission Denied)');
+                    expEl.html(`
+                        <div class="mb-2"><strong>Penyebab:</strong> Database Firestore di project Anda baru dibuat dalam status terkunci <em>(Locked/Production Mode)</em> sehingga menolak baca dan tulis.</div>
+                        <div class="p-3 bg-white rounded-3 border border-danger border-opacity-25 mb-2">
+                            <strong>Langkah Perbaikan (30 Detik):</strong>
+                            <ol class="mb-2 ps-3 mt-1">
+                                <li>Buka Firebase Console: <a href="https://console.firebase.google.com/" target="_blank" class="fw-bold text-primary text-decoration-underline">console.firebase.google.com</a></li>
+                                <li>Pilih Project Anda &gt; menu <strong>Build</strong> &gt; <strong>Firestore Database</strong> &gt; klik tab <strong>Rules</strong> di bagian atas.</li>
+                                <li>Ganti aturan yang ada dengan kode di bawah ini:</li>
+                            </ol>
+                            <pre class="bg-dark text-warning p-2 rounded small mb-2 user-select-all">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+                            <div class="small text-muted"><i class="fas fa-info-circle me-1 text-primary"></i> Klik tombol <strong>"Publish"</strong> di Firebase Console, lalu klik <strong>"Uji Ulang Koneksi"</strong> di bawah.</div>
+                        </div>
+                    `);
+                    actEl.html(`
+                        <button type="button" class="btn btn-warning text-dark btn-sm rounded-pill fw-bold px-3 shadow-sm" onclick="window.testFirebaseConnectionDetails()"><i class="fas fa-sync-alt me-1"></i> Uji Ulang Koneksi Sekarang</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.resetFirebaseConfigToDefault()"><i class="fas fa-undo me-1"></i> Kembalikan ke Database Default Bawaan</button>
+                    `);
+                } else if (isNotFound) {
+                    titleEl.html('<i class="fas fa-database text-danger me-1"></i> Database Firestore Belum Dibuat atau ID Database Tidak Cocok');
+                    expEl.html(`
+                        <div class="mb-2"><strong>Penyebab:</strong> Database Firestore belum diaktifkan di project Firebase Anda, atau masih menggunakan nama ID database bawaan template.</div>
+                        <div class="p-3 bg-white rounded-3 border border-danger border-opacity-25 mb-2">
+                            <strong>Langkah Perbaikan:</strong>
+                            <ol class="mb-2 ps-3 mt-1">
+                                <li>Buka <a href="https://console.firebase.google.com/" target="_blank" class="fw-bold text-primary text-decoration-underline">Firebase Console</a> &gt; pilih Project Anda &gt; <strong>Build</strong> &gt; <strong>Firestore Database</strong>.</li>
+                                <li>Pastikan sudah mengklik tombol <strong>"Create database"</strong> (bukan Realtime Database).</li>
+                                <li>Di Firebase biasa, ID database adalah <code>(default)</code>. Klik tombol perbaiki di bawah:</li>
+                            </ol>
+                        </div>
+                    `);
+                    actEl.html(`
+                        <button type="button" class="btn btn-success btn-sm rounded-pill fw-bold px-3 shadow-sm" onclick="window.fixDatabaseIdToDefault()"><i class="fas fa-wrench me-1"></i> Perbaiki ke Database ID (default)</button>
+                        <button type="button" class="btn btn-warning text-dark btn-sm rounded-pill fw-bold px-3 shadow-sm" onclick="window.testFirebaseConnectionDetails()"><i class="fas fa-sync-alt me-1"></i> Uji Ulang</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.resetFirebaseConfigToDefault()"><i class="fas fa-undo me-1"></i> Kembalikan ke Database Default Bawaan</button>
+                    `);
+                } else if (isApiKey) {
+                    titleEl.html('<i class="fas fa-key text-danger me-1"></i> API Key Firebase Tidak Valid');
+                    expEl.html(`
+                        <div class="mb-2"><strong>Penyebab:</strong> Nilai <code>apiKey</code> yang dimasukkan tidak cocok dengan project Firebase Anda.</div>
+                        <div class="p-2 bg-white rounded border mb-2">
+                            Buka Firebase Console &gt; Project Settings (ikon roda gigi) &gt; General &gt; scroll ke bawah ke <strong>Your apps</strong> dan salin <code>apiKey</code> yang benar.
+                        </div>
+                    `);
+                    actEl.html(`
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.resetFirebaseConfigToDefault()"><i class="fas fa-undo me-1"></i> Kembalikan ke Database Default Bawaan</button>
+                    `);
+                } else {
+                    titleEl.html('<i class="fas fa-exclamation-circle text-danger me-1"></i> Gagal Menghubungi Firebase');
+                    expEl.html(`
+                        <div class="mb-2">Pastikan project Firebase Anda sudah memiliki Firestore Database aktif di <a href="https://console.firebase.google.com/" target="_blank" class="fw-bold text-primary">console.firebase.google.com</a> dan aturan (Rules) mengizinkan akses.</div>
+                    `);
+                    actEl.html(`
+                        <button type="button" class="btn btn-success btn-sm rounded-pill fw-bold px-3 shadow-sm" onclick="window.fixDatabaseIdToDefault()"><i class="fas fa-wrench me-1"></i> Coba Database ID (default)</button>
+                        <button type="button" class="btn btn-warning text-dark btn-sm rounded-pill fw-bold px-3 shadow-sm" onclick="window.testFirebaseConnectionDetails()"><i class="fas fa-sync-alt me-1"></i> Uji Ulang</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.resetFirebaseConfigToDefault()"><i class="fas fa-undo me-1"></i> Kembalikan ke Database Default Bawaan</button>
+                    `);
+                }
+            };
+
+            window.resetFirebaseConfigToDefault = function() {
+                localStorage.removeItem('simpeg_custom_firebase_config');
+                $('#fb_snippet_paste').val('');
+                if (typeof showToast === 'function') {
+                    showToast("🔄 Konfigurasi Firebase dikembalikan ke default resmi Cloud Firestore. Memuat ulang...", "info");
+                }
+                setTimeout(() => window.location.reload(), 800);
+            };
+
+            // Initialize UI Fields on load
+            window.populateFirebaseUiFields();
         });
     </script>
 </div>
