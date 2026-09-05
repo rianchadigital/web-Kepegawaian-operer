@@ -101,9 +101,9 @@ Panduan ini berisi langkah-langkah lengkap dari awal hingga aplikasi siap diguna
 // Kredensial Database Hostinger (hPanel)
 $dbHost = 'localhost';                  // Default di Hostinger tetap 'localhost'
 $dbPort = '3306';                       // Port default MySQL
-$dbName = 'u133879636_dbsimpeg';        // Ganti dengan Nama Database Hostinger Anda
-$dbUser = 'u133879636_dbsimpeg';        // Ganti dengan Username Database Hostinger Anda
-$dbPass = 'Simpeg@2027';                // Ganti dengan Password Database Anda
+$dbName = 'u133879636_dbsimpegkawan';    // Nama Database Hostinger Anda
+$dbUser = 'u133879636_simpegkawan';     // Username Database Hostinger Anda
+$dbPass = 'Simpegkawan2026';            // Password Database Anda
 ```
 
 3. Klik tombol **Save & Close** (Simpan).

@@ -24,9 +24,9 @@ $configFile = __DIR__ . '/config.php';
 // Database Credentials from Config (Default Hostinger parameters)
 $dbHost = 'localhost';
 $dbPort = '3306';
-$dbName = 'u133879636_dbsimpeg'; 
-$dbUser = 'u133879636_dbsimpeg'; 
-$dbPass = 'Simpeg@2027';
+$dbName = 'u133879636_dbsimpegkawan'; 
+$dbUser = 'u133879636_simpegkawan'; 
+$dbPass = 'Simpegkawan2026';
 
 if (file_exists($configFile)) {
     include_once $configFile;

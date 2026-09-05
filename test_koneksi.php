@@ -13,9 +13,9 @@ $configExists = file_exists($configFile);
 
 $dbHost = 'localhost';
 $dbPort = '3306';
-$dbName = '';
-$dbUser = '';
-$dbPass = '';
+$dbName = 'u133879636_dbsimpegkawan';
+$dbUser = 'u133879636_simpegkawan';
+$dbPass = 'Simpegkawan2026';
 
 if ($configExists) {
     include_once $configFile;

@@ -9,9 +9,9 @@
 // 1. Kredensial Database Hostinger (hPanel / cPanel)
 $dbHost = 'localhost';                  // Default di Hostinger adalah 'localhost'
 $dbPort = '3306';                       // Port default MySQL
-$dbName = 'u133879636_dbsimpeg';        // Nama Database Hostinger
-$dbUser = 'u133879636_dbsimpeg';        // Username Database Hostinger
-$dbPass = 'Simpeg@2027';                // Password Database Hostinger
+$dbName = 'u133879636_dbsimpegkawan';    // Nama Database Hostinger
+$dbUser = 'u133879636_simpegkawan';     // Username Database Hostinger
+$dbPass = 'Simpegkawan2026';            // Password Database Hostinger
 
 // 2. Opsi Tambahan PDO
 $dbCharset = 'utf8mb4';
