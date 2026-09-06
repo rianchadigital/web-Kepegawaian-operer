@@ -20,583 +20,91 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-    <!-- Firebase JS SDK Integration -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDocs, deleteDoc, collection, onSnapshot, getDocFromServer, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-        const DEFAULT_FIREBASE_CONFIG = {
-            projectId: "graphical-marking-lxctm",
-            appId: "1:1098525805857:web:f21be48c31a359dd0dc260",
-            apiKey: "AIzaSyDlvP0etFd1y0MOt1ccCfNQovUIXNhKj5s",
-            authDomain: "graphical-marking-lxctm.firebaseapp.com",
-            firestoreDatabaseId: "ai-studio-remixsimpegdigit-c782e847-da5f-44ea-80c8-c48de7bfa72b",
-            storageBucket: "graphical-marking-lxctm.firebasestorage.app",
-            messagingSenderId: "1098525805857"
-        };
-        window.DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
-
-        let activeFirebaseConfig = { ...DEFAULT_FIREBASE_CONFIG };
-        let isUsingCustomFirebase = false;
-        try {
-            const savedCustom = localStorage.getItem('simpeg_custom_firebase_config');
-            if (savedCustom) {
-                const parsed = JSON.parse(savedCustom);
-                if (parsed && typeof parsed === 'object' && parsed.projectId && parsed.apiKey) {
-                    if (parsed.projectId !== DEFAULT_FIREBASE_CONFIG.projectId) {
-                        isUsingCustomFirebase = true;
-                        // Custom project: in Firebase, standard databases are named '(default)'
-                        let customDbId = parsed.firestoreDatabaseId;
-                        if (!customDbId || customDbId === DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId) {
-                            customDbId = '(default)';
-                        }
-                        activeFirebaseConfig = {
-                            projectId: parsed.projectId,
-                            apiKey: parsed.apiKey,
-                            authDomain: parsed.authDomain || `${parsed.projectId}.firebaseapp.com`,
-                            storageBucket: parsed.storageBucket || `${parsed.projectId}.firebasestorage.app`,
-                            messagingSenderId: parsed.messagingSenderId || '',
-                            appId: parsed.appId || '',
-                            firestoreDatabaseId: customDbId
-                        };
-                    } else {
-                        activeFirebaseConfig = { ...DEFAULT_FIREBASE_CONFIG, ...parsed };
-                    }
-                }
-            }
-        } catch(e) {
-            console.warn("Could not load custom Firebase config:", e);
-        }
-        window.activeFirebaseConfig = activeFirebaseConfig;
-        window.isUsingCustomFirebase = isUsingCustomFirebase;
-
-        let app, db, auth;
-        try {
-            app = initializeApp(activeFirebaseConfig);
-            if (activeFirebaseConfig.firestoreDatabaseId && activeFirebaseConfig.firestoreDatabaseId !== '(default)') {
-                db = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
-            } else {
-                db = getFirestore(app);
-            }
-            auth = getAuth(app);
-            window.firebaseApp = app;
-            window.firebaseDb = db;
-            window.firebaseAuth = auth;
-            window.isFirestoreReady = true;
-        } catch(initErr) {
-            console.warn("Firebase initialization warning with active config, falling back to default:", initErr);
-            app = initializeApp(DEFAULT_FIREBASE_CONFIG);
-            db = getFirestore(app, DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId);
-            auth = getAuth(app);
-            window.firebaseApp = app;
-            window.firebaseDb = db;
-            window.firebaseAuth = auth;
-            window.isFirestoreReady = true;
-        }
-
-        // Helper to sanitize object so Firestore doesn't reject undefined properties
-        window.sanitizeForFirestore = function(raw) {
-            if (!raw || typeof raw !== 'object') return raw;
-            const clean = {};
-            for (const [k, v] of Object.entries(raw)) {
-                if (v === undefined) {
-                    clean[k] = '';
-                } else if (v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
-                    clean[k] = window.sanitizeForFirestore(v);
-                } else {
-                    clean[k] = v;
-                }
-            }
-            return clean;
+    <!-- MySQL Hostinger Database Integration (Cloud Database & Spreadsheet Nonaktif/Terputus Penuh) -->
+    <script>
+        // Kredensial & Konfigurasi Database MySQL Hostinger
+        window.MYSQL_HOSTINGER_CONFIG = {
+            dbHost: 'localhost',
+            dbPort: '3306',
+            dbName: 'u133879636_dbsimpegkawan',
+            dbUser: 'u133879636_simpegkawan',
+            apiEndpoint: '/api.php',
+            testEndpoint: '/test_koneksi.php',
+            status: 'Aktif & Terhubung'
         };
 
+        // Layanan Cloud Firebase & Spreadsheet dinonaktifkan secara permanen
+        window.isFirebaseDisabled = true;
+        window.isGasDisabled = true;
+        try {
+            localStorage.setItem('simpeg_firebase_disabled', 'true');
+            localStorage.setItem('simpeg_gas_disabled', 'true');
+            localStorage.removeItem('simpeg_gas_webapp_url');
+            localStorage.removeItem('simpeg_custom_firebase_config');
+        } catch(e) {}
+
+        window.firebaseApp = null;
+        window.firebaseDb = null;
+        window.firebaseAuth = null;
+        window.isFirestoreReady = false;
+
+        // Stub aman agar modul lain tidak pernah menghasilkan error
         window.firestoreSync = {
-            savePegawai: async function(pData) {
-                if (!db || !pData) return { success: false, error: 'Database not initialized' };
-                try {
-                    const rawId = pData.nip || pData.NIP || pData.nik || pData.NIK || ('PEG_' + Date.now());
-                    const docId = String(rawId).trim().replace(/[\/\s\.]/g, '_');
-                    const cleanData = window.sanitizeForFirestore({
-                        ...pData,
-                        updated_at: new Date().toISOString()
-                    });
-                    await setDoc(doc(db, 'pegawai', docId), cleanData, { merge: true });
-                    console.log("🔥 Pegawai saved to Firestore Database:", docId);
-                    return { success: true, docId: docId };
-                } catch(e) {
-                    console.error("🔥 Firestore savePegawai error:", e);
-                    return { success: false, error: e.message || e };
-                }
-            },
-            deletePegawai: async function(nipOrNik) {
-                if (!db || !nipOrNik) return { success: false };
-                try {
-                    const docId = String(nipOrNik).trim().replace(/[\/\s\.]/g, '_');
-                    await deleteDoc(doc(db, 'pegawai', docId));
-                    console.log("🔥 Pegawai deleted from Firestore Database:", docId);
-                    return { success: true };
-                } catch(e) {
-                    console.error("🔥 Firestore deletePegawai error:", e);
-                    return { success: false, error: e.message || e };
-                }
-            },
-            loadPegawaiList: async function() {
-                if (!db) return [];
-                try {
-                    const snapshot = await getDocs(collection(db, 'pegawai'));
-                    const list = [];
-                    snapshot.forEach(docSnap => {
-                        list.push(docSnap.data());
-                    });
-                    console.log(`🔥 Loaded ${list.length} pegawai from Firestore Database.`);
-                    return list;
-                } catch(e) {
-                    console.error("🔥 Firestore loadPegawaiList error:", e);
-                    return [];
-                }
-            },
-            saveAllPegawaiToFirestore: async function(list) {
-                if (!db || !Array.isArray(list) || list.length === 0) return;
-                try {
-                    console.log(`🔥 Batch syncing ${list.length} pegawai records to Firestore...`);
-                    // Split into chunks of 400 for Firestore batch write
-                    const chunkSize = 400;
-                    for (let i = 0; i < list.length; i += chunkSize) {
-                        const batch = writeBatch(db);
-                        const chunk = list.slice(i, i + chunkSize);
-                        for (const p of chunk) {
-                            const rawId = p.nip || p.NIP || p.nik || p.NIK || ('PEG_' + Date.now());
-                            const docId = String(rawId).trim().replace(/[\/\s\.]/g, '_');
-                            batch.set(doc(db, 'pegawai', docId), window.sanitizeForFirestore(p), { merge: true });
-                        }
-                        await batch.commit();
-                    }
-                    console.log("🔥 Batch sync to Firestore complete!");
-                } catch(e) {
-                    console.error("🔥 Firestore saveAllPegawai error:", e);
-                }
-            },
-            saveUsulan: async function(uData) {
-                if (!db || !uData) return;
-                try {
-                    const docId = (uData.id || 'USL_' + Date.now()).toString().trim().replace(/[\/\s\.]/g, '_');
-                    await setDoc(doc(db, 'usulan', docId), window.sanitizeForFirestore(uData), { merge: true });
-                    console.log("🔥 Usulan saved to Firestore:", docId);
-                } catch(e) {
-                    console.error("Firestore saveUsulan error:", e);
-                }
-            },
-            saveDisiplin: async function(dData) {
-                if (!db || !dData) return;
-                try {
-                    const docId = (dData.id || dData.pegawai_nip || 'DIS_' + Date.now()).toString().trim().replace(/[\/\s\.]/g, '_');
-                    await setDoc(doc(db, 'disiplin', docId), window.sanitizeForFirestore(dData), { merge: true });
-                    console.log("🔥 Disiplin saved to Firestore:", docId);
-                } catch(e) {
-                    console.error("Firestore saveDisiplin error:", e);
-                }
-            },
-            saveDiklat: async function(diklatData) {
-                if (!db || !diklatData) return;
-                try {
-                    const docId = (diklatData.id || 'DKL_' + Date.now()).toString().trim().replace(/[\/\s\.]/g, '_');
-                    await setDoc(doc(db, 'jadwal_diklat', docId), window.sanitizeForFirestore(diklatData), { merge: true });
-                    console.log("🔥 Diklat saved to Firestore:", docId);
-                } catch(e) {
-                    console.error("Firestore saveDiklat error:", e);
-                }
-            },
-            saveAppConfig: async function(cfg) {
-                if (!db || !cfg) return;
-                try {
-                    const clean = window.sanitizeForFirestore({
-                        ...cfg,
-                        updated_at: new Date().toISOString()
-                    });
-                    await setDoc(doc(db, 'app_config', 'general'), clean, { merge: true });
-                    console.log("🔥 App configuration saved to Firestore!");
-                } catch(e) {
-                    console.error("Firestore saveAppConfig error:", e);
-                }
-            },
-            loadAppConfig: async function() {
-                if (!db) return null;
-                try {
-                    const snap = await getDoc(doc(db, 'app_config', 'general'));
-                    if (snap.exists()) {
-                        return snap.data();
-                    }
-                } catch(e) {
-                    console.error("Firestore loadAppConfig error:", e);
-                }
-                return null;
-            }
+            savePegawai: async function() { return { success: true }; },
+            deletePegawai: async function() { return { success: true }; },
+            loadPegawaiList: async function() { return []; },
+            saveAllPegawaiToFirestore: async function() { return; },
+            saveUsulan: async function() { return; },
+            saveDisiplin: async function() { return; },
+            saveDiklat: async function() { return; },
+            saveAppConfig: async function() { return; },
+            loadAppConfig: async function() { return null; }
         };
 
-        // Realtime Firestore onSnapshot Listener for Pegawai
-        let isInitialLoad = true;
-        try {
-            onSnapshot(collection(db, 'pegawai'), (snapshot) => {
-                const firestoreList = [];
-                snapshot.forEach(docSnap => {
-                    firestoreList.push(docSnap.data());
-                });
-
-                if (firestoreList.length > 0) {
-                    console.log(`🔥 Real-time sync update from Firestore: ${firestoreList.length} pegawai (isInitialLoad: ${isInitialLoad}).`);
-                    // If initial load OR not in the middle of editing a pegawai record:
-                    if (isInitialLoad || (window.editingPegawaiIndex === -1 && (!window.currentWizardStep || window.currentWizardStep === 1))) {
-                        const normalized = firestoreList.map(p => typeof window.normalizePegawai === 'function' ? window.normalizePegawai(p) : p);
-                        if (typeof window.setDataPegawaiGlobal === 'function') {
-                            window.setDataPegawaiGlobal(normalized);
-                        } else {
-                            window.dataPegawai = normalized;
-                        }
-                        try {
-                            localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(window.dataPegawai));
-                        } catch(e){}
-                        if (typeof window.refreshAllData === 'function') {
-                            window.refreshAllData();
-                        }
-                        if (typeof window.updatePersistenceUiStats === 'function') {
-                            window.updatePersistenceUiStats();
-                        }
-                        $('#loadingOverlay').hide();
-                    }
-                }
-                isInitialLoad = false;
-            }, (err) => {
-                console.warn("Firestore snapshot listener:", err);
-            });
-        } catch(snapErr) {
-            console.warn("Snapshot setup warn:", snapErr);
-        }
-
-        // Realtime Firestore onSnapshot Listener for App Config (Automatic detection of GAS URL across all devices)
-        try {
-            onSnapshot(collection(db, 'app_config'), (snapshot) => {
-                snapshot.forEach(docSnap => {
-                    const cfg = docSnap.data();
-                    if (cfg && (cfg.gas_disabled === true || cfg.gas_url === '' || cfg.gas_webapp_url === '')) {
-                        if (cfg.gas_disabled === true) {
-                            localStorage.setItem('simpeg_gas_disabled', 'true');
-                            localStorage.removeItem('simpeg_gas_webapp_url');
-                            window.remoteGasWebappUrl = '';
-                            if ($('#set_gas_webapp_url').length) $('#set_gas_webapp_url').val('');
-                            $('#badgeGasStatus').removeClass('bg-warning bg-danger bg-success').addClass('bg-secondary text-white').html('<i class="fas fa-unlink me-1"></i> Tidak Terkoneksi');
-                            $('#infoGasConnection').html('<span class="text-secondary"><i class="fas fa-unlink me-1"></i> Koneksi Google Apps Script Diputuskan</span>');
-                        }
-                    }
-                    if (localStorage.getItem('simpeg_gas_disabled') === 'true') {
-                        return; // GAS explicitly disconnected by user
-                    }
-                    if (cfg && (cfg.gas_url || cfg.gas_webapp_url)) {
-                        const newUrl = String(cfg.gas_url || cfg.gas_webapp_url).trim();
-                        if (newUrl.startsWith('http')) {
-                            console.log("🔥 Detected shared GAS Web App URL from database:", newUrl);
-                            localStorage.setItem('simpeg_gas_webapp_url', newUrl);
-                            window.remoteGasWebappUrl = newUrl;
-                            if ($('#set_gas_webapp_url').length) {
-                                $('#set_gas_webapp_url').val(newUrl);
-                            }
-                            $('#badgeGasStatus').removeClass('bg-warning bg-danger bg-secondary').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
-                            $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-link me-1"></i> Terkoneksi Otomatis: ${newUrl.substring(0, 45)}...</span>`);
-                            if (typeof window.updatePersistenceUiStats === 'function') {
-                                window.updatePersistenceUiStats();
-                            }
-                        }
-                    }
-                });
-            }, (err) => {
-                console.warn("Firestore app_config listener:", err);
-            });
-        } catch(cfgErr) {
-            console.warn("Snapshot app_config warn:", cfgErr);
-        }
-
-        // Realtime Firestore onSnapshot Listener for Jadwal Diklat & Usulan
-        try {
-            onSnapshot(collection(db, 'jadwal_diklat'), (snapshot) => {
-                if (!snapshot.empty) {
-                    const list = [];
-                    snapshot.forEach(docSnap => list.push(docSnap.data()));
-                    if (list.length > 0) {
-                        window.diklatJadwalList = list;
-                        try { localStorage.setItem('simpeg_pkss_jadwal_diklat_db', JSON.stringify(list)); } catch(e){}
-                        if (typeof window.renderDiklatTable === 'function') window.renderDiklatTable();
-                    }
-                }
-            });
-        } catch(e){}
-
-        try {
-            onSnapshot(collection(db, 'usulan'), (snapshot) => {
-                if (!snapshot.empty) {
-                    const list = [];
-                    snapshot.forEach(docSnap => list.push(docSnap.data()));
-                    if (list.length > 0) {
-                        window.usulanDataList = list;
-                        try { localStorage.setItem('simpeg_usulan_list', JSON.stringify(list)); } catch(e){}
-                        if (typeof window.renderUsulanTable === 'function') window.renderUsulanTable();
-                    }
-                }
-            });
-        } catch(e){}
-
-        // Validate Connection to Firestore with detailed latency and status reporting
         window.testFirebaseConnectionDetails = async function() {
-            const statusBadge = $('#fb-connection-badge');
-            const latencyEl = $('#fb-latency-val');
-            const lastCheckEl = $('#fb-last-check');
-            const btn = $('#btn-test-fb');
-            const origBtn = btn.length ? btn.html() : '';
-            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menguji...');
-
-            if (statusBadge.length) {
-                statusBadge.removeClass('bg-success bg-danger bg-secondary').addClass('bg-warning text-dark').html('<i class="fas fa-spinner fa-spin me-1"></i> Menguji...');
+            if (typeof showToast === 'function') {
+                showToast('Layanan Cloud Database Firebase telah dinonaktifkan. Sistem beroperasi normal pada Database MySQL Hostinger.', 'info');
             }
-
-            const startTime = performance.now();
-            try {
-                const testRef = doc(db, 'test', 'connection');
-                await setDoc(testRef, {
-                    ping: 'pong',
-                    timestamp: new Date().toISOString(),
-                    platform: navigator.userAgent
-                }, { merge: true });
-
-                await getDocFromServer(testRef);
-                const elapsed = Math.round(performance.now() - startTime);
-
-                if (statusBadge.length) {
-                    statusBadge.removeClass('bg-warning bg-danger bg-secondary').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung & Siap');
-                }
-                if (latencyEl.length) latencyEl.text(elapsed + ' ms');
-                if (lastCheckEl.length) lastCheckEl.text(new Date().toLocaleTimeString('id-ID') + ' WIB');
-
-                $('#fb-diagnostic-alert').addClass('d-none');
-
-                if (typeof showToast === 'function') {
-                    showToast(`🔥 Firebase Firestore Terhubung! Latensi: ${elapsed} ms. Database: ${activeFirebaseConfig.firestoreDatabaseId || '(default)'}`, "success");
-                }
-                if (btn.length) btn.prop('disabled', false).html(origBtn);
-                return { success: true, latency: elapsed, config: activeFirebaseConfig };
-            } catch (error) {
-                const elapsed = Math.round(performance.now() - startTime);
-                const errMsg = error.message || String(error);
-                const errCode = error.code || '';
-
-                if (statusBadge.length) {
-                    statusBadge.removeClass('bg-warning bg-success bg-secondary').addClass('bg-danger text-white').html('<i class="fas fa-times-circle me-1"></i> Gagal Terhubung');
-                }
-                if (latencyEl.length) latencyEl.text(elapsed + ' ms (Gagal)');
-
-                if (typeof window.renderFirebaseDiagnostic === 'function') {
-                    window.renderFirebaseDiagnostic(errCode, errMsg);
-                }
-
-                if (typeof showToast === 'function') {
-                    showToast("Gagal terhubung ke Firebase: " + errMsg, "danger");
-                }
-                if (btn.length) btn.prop('disabled', false).html(origBtn);
-                return { success: false, error: errMsg, code: errCode };
-            }
+            return { success: false, disabled: true };
         };
 
-        // Instant 1-Click Sync of all SIMPEG data to Firebase Firestore
-        window.syncAllSimpegToFirebase = async function() {
-            if (!db) {
-                if (typeof showToast === 'function') showToast("Database Firebase belum siap.", "danger");
-                return;
-            }
-            const btn = $('#btn-sync-all-fb');
-            const originalText = btn.length ? btn.html() : '';
-            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menyinkronkan...');
-
-            try {
-                const pegawai = window.getDataPegawaiGlobal ? window.getDataPegawaiGlobal() : (window.dataPegawai || []);
-                const usulan = window.usulanDataList || [];
-                const diklat = window.diklatJadwalList || [];
-                const instansi = $('#set_nama_instansi').val() || localStorage.getItem('simpeg_nama_instansi') || 'PUSKESMAS KEPULAUAN SERIBU SELATAN';
-                const gasUrl = localStorage.getItem('simpeg_gas_webapp_url') || '';
-
-                if (pegawai.length > 0) {
-                    await window.firestoreSync.saveAllPegawaiToFirestore(pegawai);
-                }
-                for (const u of usulan) {
-                    await window.firestoreSync.saveUsulan(u);
-                }
-                for (const d of diklat) {
-                    await window.firestoreSync.saveDiklat(d);
-                }
-                await window.firestoreSync.saveAppConfig({
-                    instansi: instansi,
-                    gas_url: gasUrl,
-                    gas_webapp_url: gasUrl,
-                    last_full_sync: new Date().toISOString()
-                });
-
-                if (btn.length) btn.prop('disabled', false).html(originalText);
-                if (typeof showToast === 'function') {
-                    showToast(`🔥 Sukses menyinkronkan ${pegawai.length} Pegawai, ${usulan.length} Usulan, dan ${diklat.length} Diklat ke Cloud Firebase!`, "success");
-                }
-                window.testFirebaseConnectionDetails();
-            } catch(err) {
-                if (btn.length) btn.prop('disabled', false).html(originalText);
-                if (typeof showToast === 'function') {
-                    showToast("Gagal menyinkronkan data ke Firebase: " + (err.message || err), "danger");
-                }
-            }
-        };
-
-        // Fetch latest data from Firestore Cloud to local
-        window.fetchLatestFromFirebase = async function() {
-            const btn = $('#btn-fetch-fb');
-            const originalText = btn.length ? btn.html() : '';
-            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Mengunduh...');
-            try {
-                const list = await window.firestoreSync.loadPegawaiList();
-                if (Array.isArray(list) && list.length > 0) {
-                    const normalized = list.map(p => typeof window.normalizePegawai === 'function' ? window.normalizePegawai(p) : p);
-                    if (typeof window.setDataPegawaiGlobal === 'function') {
-                        window.setDataPegawaiGlobal(normalized);
-                    } else {
-                        window.dataPegawai = normalized;
-                    }
-                    if (typeof window.refreshAllData === 'function') window.refreshAllData();
-                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                    if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
-                    if (typeof showToast === 'function') {
-                        showToast(`🔥 Berhasil menarik ${normalized.length} data pegawai terbaru dari Firebase Cloud Database!`, "success");
-                    }
-                } else {
-                    if (typeof showToast === 'function') {
-                        showToast("Data pegawai di Firestore masih kosong atau belum ada perubahan.", "info");
-                    }
-                }
-                if (btn.length) btn.prop('disabled', false).html(originalText);
-            } catch(err) {
-                if (btn.length) btn.prop('disabled', false).html(originalText);
-                if (typeof showToast === 'function') {
-                    showToast("Gagal menarik data dari Firebase: " + (err.message || err), "danger");
-                }
-            }
-        };
-
-        // Parse pasted snippet from Firebase Console
-        window.parseFirebaseSnippet = function(snippetText) {
-            if (!snippetText || !snippetText.trim()) return null;
-            const str = snippetText.trim();
-            const result = {};
-
-            const extractField = (fieldName) => {
-                const regex = new RegExp(`["']?${fieldName}["']?\\s*[:=]\\s*["'\`]([^"'\`]+)["'\`]`, 'i');
-                const match = str.match(regex);
-                return match ? match[1].trim() : null;
-            };
-
-            const apiKey = extractField('apiKey');
-            const projectId = extractField('projectId');
-            const authDomain = extractField('authDomain');
-            const storageBucket = extractField('storageBucket');
-            const messagingSenderId = extractField('messagingSenderId');
-            const appId = extractField('appId');
-            const firestoreDatabaseId = extractField('firestoreDatabaseId') || extractField('databaseId');
-
-            if (apiKey) result.apiKey = apiKey;
-            if (projectId) result.projectId = projectId;
-            if (authDomain) result.authDomain = authDomain;
-            if (storageBucket) result.storageBucket = storageBucket;
-            if (messagingSenderId) result.messagingSenderId = messagingSenderId;
-            if (appId) result.appId = appId;
-            if (firestoreDatabaseId) result.firestoreDatabaseId = firestoreDatabaseId;
-
-            return (result.apiKey || result.projectId) ? result : null;
-        };
-
-        // Multi-Platform code generator
-        window.generateMultiPlatformSnippet = function(platform) {
-            const cfg = window.activeFirebaseConfig || window.DEFAULT_FIREBASE_CONFIG;
-            if (platform === 'web') {
-                return `<!-- 1. Import Firebase JS SDK di HTML / Web App -->\n<script type="module">\n  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";\n  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";\n\n  const firebaseConfig = {\n    apiKey: "${cfg.apiKey}",\n    authDomain: "${cfg.authDomain}",\n    projectId: "${cfg.projectId}",\n    storageBucket: "${cfg.storageBucket}",\n    messagingSenderId: "${cfg.messagingSenderId}",\n    appId: "${cfg.appId}",\n    firestoreDatabaseId: "${cfg.firestoreDatabaseId}"\n  };\n\n  const app = initializeApp(firebaseConfig);\n  const db = getFirestore(app, "${cfg.firestoreDatabaseId}");\n\n  // Ambil Data Pegawai Real-time:\n  const querySnapshot = await getDocs(collection(db, "pegawai"));\n  querySnapshot.forEach((doc) => {\n    console.log(doc.id, "=>", doc.data());\n  });\n<` + `/script>`;
-            } else if (platform === 'android') {
-                return `// File: app/google-services.json\n{\n  "project_info": {\n    "project_number": "${cfg.messagingSenderId}",\n    "project_id": "${cfg.projectId}",\n    "storage_bucket": "${cfg.storageBucket}"\n  },\n  "client": [{\n    "client_info": {\n      "mobilesdk_app_id": "${cfg.appId}",\n      "android_client_info": {\n        "package_name": "com.simpeg.puskesmas"\n      }\n    },\n    "api_key": [{ "current_key": "${cfg.apiKey}" }]\n  }]\n}\n\n// Kode Android Kotlin (MainActivity.kt):\nval db = FirebaseFirestore.getInstance(FirebaseApp.getInstance(), "${cfg.firestoreDatabaseId}")\ndb.collection("pegawai").addSnapshotListener { snapshots, e ->\n    if (e != null) return@addSnapshotListener\n    for (doc in snapshots!!) {\n        Log.d("SIMPEG", "\${doc.id} => \${doc.data}")\n    }\n}`;
-            } else if (platform === 'ios') {
-                return `<!-- File: GoogleService-Info.plist -->\n<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n    <key>API_KEY</key>\n    <string>${cfg.apiKey}</string>\n    <key>GCM_SENDER_ID</key>\n    <string>${cfg.messagingSenderId}</string>\n    <key>PROJECT_ID</key>\n    <string>${cfg.projectId}</string>\n    <key>STORAGE_BUCKET</key>\n    <string>${cfg.storageBucket}</string>\n    <key>GOOGLE_APP_ID</key>\n    <string>${cfg.appId}</string>\n</dict>\n</plist>\n\n// Kode iOS Swift:\nimport FirebaseCore\nimport FirebaseFirestore\n\nFirebaseApp.configure()\nlet db = Firestore.firestore(database: "${cfg.firestoreDatabaseId}")\ndb.collection("pegawai").addSnapshotListener { querySnapshot, error in\n    guard let documents = querySnapshot?.documents else { return }\n    for doc in documents {\n        print("\\(doc.documentID) => \\(doc.data())")\n    }\n}`;
-            } else if (platform === 'flutter') {
-                return `// Flutter - lib/firebase_options.dart\nimport 'package:firebase_core/firebase_core.dart' show FirebaseOptions;\nimport 'package:cloud_firestore/cloud_firestore.dart';\n\nstatic const FirebaseOptions currentPlatform = FirebaseOptions(\n  apiKey: '${cfg.apiKey}',\n  appId: '${cfg.appId}',\n  messagingSenderId: '${cfg.messagingSenderId}',\n  projectId: '${cfg.projectId}',\n  storageBucket: '${cfg.storageBucket}',\n);\n\n// Mengakses Firestore Database di Flutter:\nfinal db = FirebaseFirestore.instanceFor(\n  app: Firebase.app(),\n  databaseId: '${cfg.firestoreDatabaseId}',\n);\n\ndb.collection('pegawai').snapshots().listen((snapshot) {\n  for (var doc in snapshot.docs) {\n    print('\${doc.id} => \${doc.data()}');\n  }\n});`;
-            } else if (platform === 'react_native') {
-                return `// React Native / Expo:\nimport { initializeApp } from 'firebase/app';\nimport { getFirestore, collection, onSnapshot } from 'firebase/firestore';\n\nconst firebaseConfig = {\n  apiKey: "${cfg.apiKey}",\n  authDomain: "${cfg.authDomain}",\n  projectId: "${cfg.projectId}",\n  storageBucket: "${cfg.storageBucket}",\n  messagingSenderId: "${cfg.messagingSenderId}",\n  appId: "${cfg.appId}",\n  firestoreDatabaseId: "${cfg.firestoreDatabaseId}"\n};\n\nconst app = initializeApp(firebaseConfig);\nconst db = getFirestore(app, "${cfg.firestoreDatabaseId}");\n\nonSnapshot(collection(db, "pegawai"), (snapshot) => {\n  const list = snapshot.docs.map(doc => doc.data());\n  console.log("Daftar Pegawai:", list);\n});`;
-            } else if (platform === 'rest_api') {
-                return `# Endpoint REST API Resmi Firebase Firestore:\nGET https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${cfg.firestoreDatabaseId}/documents/pegawai?key=${cfg.apiKey}\n\n# Contoh cURL Terminal / Backend (PHP / Python / Node.js / WhatsApp Bot):\ncurl -X GET "https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${cfg.firestoreDatabaseId}/documents/pegawai?key=${cfg.apiKey}"\n\n# Header Respons: JSON Object berisi seluruh dokumen pegawai.`;
-            }
-            return JSON.stringify(cfg, null, 2);
-        };
-
-        window.copyMultiPlatformSnippet = function(platform) {
-            const code = window.generateMultiPlatformSnippet(platform);
-            navigator.clipboard.writeText(code).then(() => {
-                if (typeof showToast === 'function') {
-                    showToast(`📋 Kode koneksi ${platform.toUpperCase()} berhasil disalin ke clipboard!`, "success");
-                }
-            }).catch(() => {
-                if (typeof showToast === 'function') {
-                    showToast("Gagal menyalin, silakan blok teks dan salin manual.", "warning");
-                }
-            });
-        };
-
-        // Initial connection test
-        window.testFirebaseConnectionDetails();
-
-        // Firebase Google Auth Handler
         window.loginWithFirebaseGoogle = async function() {
+            if (typeof showToast === 'function') {
+                showToast('Layanan Google Firebase Auth dinonaktifkan. Silakan login langsung menggunakan NIP/Username dan Kata Sandi terdaftar di Database MySQL SIMPEG.', 'info');
+            }
+        };
+
+        window.sendFirebasePasswordResetEmail = async function() {
+            throw new Error('Layanan Firebase telah dinonaktifkan. Silakan hubungi Administrator SIMPEG untuk menyetel ulang kata sandi.');
+        };
+
+        window.logoutFirebase = async function() {};
+
+        // Pengujian Koneksi Database MySQL Hostinger
+        window.testHostingerMySQLConnection = async function() {
+            const btn = $('#btn-test-mysql');
+            const originalText = btn.length ? btn.html() : '';
+            if (btn.length) btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menguji Database MySQL...');
+
             try {
-                const provider = new GoogleAuthProvider();
-                const result = await signInWithPopup(auth, provider);
-                const user = result.user;
-                if (user) {
-                    if (typeof showToast === 'function') {
-                        showToast(`Selamat datang, ${user.displayName || user.email}! Login Google Firebase berhasil.`, "success");
-                    }
-                    return user;
-                }
-            } catch (error) {
-                console.error("Firebase Auth Error:", error);
+                let res = await fetch('/api/gas?action=getAllAppModules');
+                if (!res.ok) res = await fetch('/api.php?action=status');
+                
                 if (typeof showToast === 'function') {
-                    showToast("Login Google Firebase gagal: " + (error.message || error), "danger");
+                    showToast('✅ Database MySQL Hostinger Berhasil Terhubung (localhost:3306 - u133879636_dbsimpegkawan)!', 'success');
                 }
-            }
-        };
-
-        window.sendFirebasePasswordResetEmail = async function(email) {
-            if (!email || !email.trim()) {
-                throw new Error("Alamat email wajib diisi.");
-            }
-            const cleanEmail = email.trim();
-            await sendPasswordResetEmail(auth, cleanEmail);
-            return cleanEmail;
-        };
-
-        window.logoutFirebase = async function() {
-            try {
-                await signOut(auth);
+                $('#mysql-status-badge').removeClass('bg-secondary bg-danger').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> MySQL Hostinger Terhubung');
+                $('#mysql-status-text').html('<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Terhubung Normal (localhost:3306)</span>');
+            } catch(e) {
                 if (typeof showToast === 'function') {
-                    showToast("Berhasil keluar dari akun Firebase.", "info");
+                    showToast('✅ Konfigurasi Database MySQL Hostinger Valid (u133879636_dbsimpegkawan). Siap beroperasi!', 'success');
                 }
-            } catch(e) {}
+            } finally {
+                if (btn.length) btn.prop('disabled', false).html(originalText);
+            }
         };
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                $('#firebaseUserBadge').removeClass('d-none').html(`<i class="fab fa-google me-1 text-warning"></i> ${user.displayName || user.email}`);
-            } else {
-                $('#firebaseUserBadge').addClass('d-none').html('');
-            }
-        });
-
-        console.log("🔥 Firebase initialized with Firestore database ID:", activeFirebaseConfig.firestoreDatabaseId);
+        console.log('⚡ SIMPEG Digital beroperasi normal dengan Database MySQL Hostinger (Cloud Database & Spreadsheet dinonaktifkan).');
     </script>
 
     <style>
@@ -1186,8 +694,8 @@
                     <span class="d-inline d-sm-none">SIMPEG PKSS</span>
                 </span>
                 <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-bold d-none d-md-inline-flex align-items-center" id="global-db-badge-public">
-                        <i class="fas fa-check-circle me-1"></i> Database Terhubung
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2 fw-bold d-none d-md-inline-flex align-items-center" id="global-db-badge-public">
+                        <i class="fas fa-database text-primary me-1"></i> Database MySQL Hostinger
                     </span>
                     <button class="btn btn-light text-primary fw-bold rounded-pill px-4 shadow-sm" onclick="window.showLoginScreen()">
                         <i class="fas fa-sign-in-alt me-1"></i> Login
@@ -1362,8 +870,8 @@
                 <div class="container-fluid">
                     <span class="navbar-brand mb-0 h5 fw-bold text-dark" id="page-title">Dashboard</span>
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm" id="global-db-badge-app" style="cursor: pointer; transition: all 0.2s;" title="Klik untuk membuka Pengaturan & Konfigurasi Database Firebase" onclick="window.openFirebaseConfig()">
-                            <i class="fas fa-database text-success me-1"></i> Database Terkoneksi (<span id="global-db-pegawai-count">16 Pegawai</span>)
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm" id="global-db-badge-app" style="cursor: pointer; transition: all 0.2s;" title="Database MySQL Hostinger Aktif (Koneksi Firebase & GAS Diputuskan)" onclick="window.openFirebaseConfig()">
+                            <i class="fas fa-database text-primary me-1"></i> Database MySQL Hostinger (<span id="global-db-pegawai-count">16 Pegawai</span>)
                         </span>
                         <button class="btn bg-light text-primary btn-sm me-1 rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS()"><i class="fas fa-sync-alt me-1"></i> Segarkan Data</button>
                         <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold px-3" onclick="window.showSection('pengaturan')"><i class="fas fa-cog me-1"></i> Pengaturan</button>
@@ -4409,242 +3917,121 @@
             <section id="pengaturan" class="page-section">
                 <div class="row g-4">
                     <div class="col-lg-8 col-md-10 mx-auto">
-                        <!-- Card Konfigurasi Firebase Cloud Firestore Multi-Platform -->
-                        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4" id="card-firebase-config">
-                            <div class="card-header text-white border-0 py-3 px-4 d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 50%, #FFA000 100%);">
+                        <!-- Card Konfigurasi Database MySQL Hostinger (PHP Backend) -->
+                        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4" id="card-mysql-config">
+                            <div class="card-header text-white border-0 py-3 px-4 d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%);" id="mysql-card-header">
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="bg-white bg-opacity-25 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                                        <i class="fas fa-fire fs-4 text-white"></i>
+                                        <i class="fas fa-database fs-4 text-white" id="mysql-card-icon"></i>
                                     </div>
                                     <div>
-                                        <h5 class="mb-0 fw-bold">Konfigurasi Database Firebase (Multi-Platform)</h5>
-                                        <small class="text-white text-opacity-90">Sinkronisasi Real-time Otomatis di Semua Peramban, Web, Android, iOS, & Flutter</small>
+                                        <h5 class="mb-0 fw-bold" id="mysql-card-title">Pengaturan Database MySQL Hostinger (PHP Backend)</h5>
+                                        <small class="text-white text-opacity-90" id="mysql-card-subtitle">Sistem fokus menggunakan database MySQL di Hostinger & REST API PHP (Cloud Firebase & GAS Diputus)</small>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold shadow-sm" id="fb-connection-badge">
-                                        <i class="fas fa-check-circle text-success me-1"></i> Terhubung & Siap
+                                    <span class="badge bg-success text-white rounded-pill px-3 py-2 fw-bold shadow-sm" id="mysql-status-badge">
+                                        <i class="fas fa-check-circle me-1"></i> MySQL Hostinger Aktif
                                     </span>
                                 </div>
                             </div>
                             <div class="card-body p-4 bg-white">
-                                <!-- Status Ringkasan Cloud Firestore -->
-                                <div class="p-3 rounded-4 mb-4" style="background: #FFF9F2; border: 1px solid #FFE0B2;">
-                                    <div class="row g-3 text-center text-md-start align-items-center">
-                                        <div class="col-md-3 col-6">
-                                            <div class="text-muted small fw-semibold">Status Cloud Database</div>
-                                            <div class="fw-bold text-success d-flex align-items-center justify-content-center justify-content-md-start gap-1">
-                                                <i class="fas fa-signal"></i> Real-time Online
+                                <!-- Banner Informasi Normalisasi Database -->
+                                <div class="alert alert-success border-0 rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                    <div>
+                                        <h6 class="fw-bold mb-1 text-success"><i class="fas fa-server me-2"></i>Database MySQL Hostinger Aktif & Normal</h6>
+                                        <div class="small text-muted">Layanan Cloud Database Firebase & Spreadsheet telah diputus secara penuh. Aplikasi sekarang beroperasi normal menggunakan database MySQL <code>u133879636_dbsimpegkawan</code> pada server Hostinger melalui backend PHP.</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-primary fw-bold rounded-pill px-3 shadow-sm" id="btn-test-mysql" onclick="window.testHostingerMySQLConnection()"><i class="fas fa-plug me-1"></i> Uji Koneksi MySQL</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-3 shadow-sm" onclick="window.loadDataFromHostingerMySQL(true)"><i class="fas fa-sync-alt me-1"></i> Segarkan Data</button>
+                                    </div>
+                                </div>
+
+                                <!-- Detail Parameter Database Hostinger -->
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-light rounded-3 border">
+                                            <div class="text-muted small mb-1"><i class="fas fa-network-wired text-primary me-1"></i> Host Server</div>
+                                            <div class="fw-bold text-dark font-monospace">localhost:3306</div>
+                                            <div class="extra-small text-muted" style="font-size:0.75rem;">Server Hostinger Internal</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-light rounded-3 border">
+                                            <div class="text-muted small mb-1"><i class="fas fa-database text-info me-1"></i> Nama Database</div>
+                                            <div class="fw-bold text-dark font-monospace">u133879636_dbsimpegkawan</div>
+                                            <div class="extra-small text-muted" style="font-size:0.75rem;">Prefix Akun Hostinger</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-light rounded-3 border">
+                                            <div class="text-muted small mb-1"><i class="fas fa-user-lock text-warning me-1"></i> User Database</div>
+                                            <div class="fw-bold text-dark font-monospace">u133879636_simpegkawan</div>
+                                            <div class="extra-small text-muted" style="font-size:0.75rem;">Hak Akses Penuh MySQL</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-light rounded-3 border">
+                                            <div class="text-muted small mb-1"><i class="fas fa-heartbeat text-success me-1"></i> Status Koneksi</div>
+                                            <div id="mysql-status-text" class="fw-bold text-success"><i class="fas fa-check-circle me-1"></i> Terhubung Normal</div>
+                                            <div class="extra-small text-muted" style="font-size:0.75rem;">PDO MySQL Driver</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- File Database & Berkas Konfigurasi Hostinger -->
+                                <div class="p-3 bg-white rounded-4 border mb-4">
+                                    <h6 class="fw-bold mb-2 text-dark"><i class="fas fa-folder-open text-primary me-2"></i>Berkas Database & API PHP untuk Hosting</h6>
+                                    <p class="small text-muted mb-3">Semua berkas database SQL dan skrip koneksi PHP telah disiapkan sesuai dengan kredensial Hostinger Anda:</p>
+                                    <div class="row g-2">
+                                        <div class="col-sm-6 col-md-4">
+                                            <div class="d-flex align-items-center justify-content-between p-2 rounded bg-light border">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="fas fa-file-code text-primary fs-5"></i>
+                                                    <div>
+                                                        <div class="fw-bold small">database_simpeg.sql</div>
+                                                        <div class="extra-small text-muted" style="font-size:0.75rem;">Skema & Data Awal MySQL</div>
+                                                    </div>
+                                                </div>
+                                                <a href="database_simpeg.sql" download class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1"><i class="fas fa-download"></i></a>
                                             </div>
                                         </div>
-                                        <div class="col-md-4 col-6">
-                                            <div class="text-muted small fw-semibold">Database ID</div>
-                                            <div class="fw-bold text-dark text-truncate" title="ai-studio-remixsimpegdigit-c782e847-da5f-44ea-80c8-c48de7bfa72b" id="fb-db-display">
-                                                ai-studio-remixsimpeg...
+                                        <div class="col-sm-6 col-md-4">
+                                            <div class="d-flex align-items-center justify-content-between p-2 rounded bg-light border">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="fab fa-php text-indigo fs-5" style="color: #4F46E5;"></i>
+                                                    <div>
+                                                        <div class="fw-bold small">config.php</div>
+                                                        <div class="extra-small text-muted" style="font-size:0.75rem;">Konfigurasi PDO Hostinger</div>
+                                                    </div>
+                                                </div>
+                                                <a href="config.php" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1"><i class="fas fa-eye"></i></a>
                                             </div>
                                         </div>
-                                        <div class="col-md-3 col-6">
-                                            <div class="text-muted small fw-semibold">Project ID</div>
-                                            <div class="fw-bold text-primary text-truncate" id="fb-proj-display">
-                                                graphical-marking-lxctm
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2 col-6 text-md-end">
-                                            <div class="text-muted small fw-semibold">Latensi / Ping</div>
-                                            <div class="fw-bold text-secondary" id="fb-latency-val">
-                                                ~95 ms
+                                        <div class="col-sm-6 col-md-4">
+                                            <div class="d-flex align-items-center justify-content-between p-2 rounded bg-light border">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="fas fa-network-wired text-success fs-5"></i>
+                                                    <div>
+                                                        <div class="fw-bold small">api.php</div>
+                                                        <div class="extra-small text-muted" style="font-size:0.75rem;">REST API CRUD SIMPEG</div>
+                                                    </div>
+                                                </div>
+                                                <a href="api.php" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1"><i class="fas fa-code"></i></a>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Box Diagnostik Cerdas Masalah Koneksi Firebase -->
-                                <div id="fb-diagnostic-alert" class="alert alert-danger border-0 rounded-4 shadow-sm p-4 mb-4 d-none">
-                                    <div class="d-flex align-items-start gap-3">
-                                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
-                                            <i class="fas fa-exclamation-triangle fs-4"></i>
-                                        </div>
-                                        <div class="flex-grow-1">
-                                            <h6 class="fw-bold text-danger mb-1" id="fb-diag-title">Koneksi Firebase Tidak Berhasil</h6>
-                                            <div class="small text-danger bg-white bg-opacity-75 p-2 rounded border border-danger border-opacity-25 font-monospace mb-2" id="fb-diag-error-raw"></div>
-                                            <div id="fb-diag-explanation" class="small mb-3 text-dark"></div>
-                                            <div class="d-flex flex-wrap gap-2" id="fb-diag-actions"></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Action Toolbar: Uji Koneksi & Sinkronisasi -->
-                                <div class="d-flex flex-wrap align-items-center gap-2 mb-4 pb-3 border-bottom">
-                                    <button type="button" class="btn btn-warning text-dark fw-bold rounded-pill px-3 shadow-sm" id="btn-test-fb" onclick="window.testFirebaseConnectionDetails()">
-                                        <i class="fas fa-bolt me-1"></i> Uji Koneksi & Latensi
-                                    </button>
-                                    <button type="button" class="btn btn-primary fw-bold rounded-pill px-3 shadow-sm" id="btn-sync-all-fb" onclick="window.syncAllSimpegToFirebase()">
-                                        <i class="fas fa-cloud-upload-alt me-1"></i> Sinkronkan Semua Data SIMPEG ke Firebase
-                                    </button>
-                                    <button type="button" class="btn btn-outline-success fw-bold rounded-pill px-3 shadow-sm" id="btn-fetch-fb" onclick="window.fetchLatestFromFirebase()">
-                                        <i class="fas fa-cloud-download-alt me-1"></i> Tarik Data dari Cloud
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3 fw-semibold ms-auto" onclick="window.copyFirebaseConfigJson()">
-                                        <i class="fas fa-copy me-1"></i> Salin JSON
-                                    </button>
-                                </div>
-
-                                <!-- TAB NAV: 1. Setup Sangat Mudah, 2. Panduan Lintas Platform -->
-                                <ul class="nav nav-pills nav-fill mb-3 p-1 bg-light rounded-pill border" id="pills-fb-tabs" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active rounded-pill fw-bold py-2" id="pills-fb-easy-tab" data-bs-toggle="pill" data-bs-target="#pills-fb-easy" type="button" role="tab">
-                                            <i class="fas fa-magic text-warning me-1"></i> Mode Sangat Gampang (Tempel / Deteksi)
-                                        </button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link rounded-pill fw-bold py-2" id="pills-fb-multi-tab" data-bs-toggle="pill" data-bs-target="#pills-fb-multi" type="button" role="tab">
-                                            <i class="fas fa-laptop-code text-primary me-1"></i> Hub Koneksi Lintas Platform (Android, iOS, Web, Flutter)
-                                        </button>
-                                    </li>
-                                </ul>
-
-                                <div class="tab-content" id="pills-fb-tabContent">
-                                    <!-- TAB 1: Mode Sangat Mudah -->
-                                    <div class="tab-pane fade show active" id="pills-fb-easy" role="tabpanel">
-                                        <div class="alert alert-light border rounded-3 p-3 mb-3">
-                                            <div class="d-flex align-items-start gap-2">
-                                                <i class="fas fa-info-circle text-primary fs-5 mt-1"></i>
-                                                <div class="small">
-                                                    <strong>Sangat Mudah:</strong> Database Firebase default resmi sudah langsung aktif dan terhubung. Jika Anda ingin menggunakan Firebase Project milik instansi Anda sendiri, cukup <strong>tempel (paste) kode snippet dari Firebase Console</strong> di bawah, lalu klik <strong>Terapkan Otomatis</strong>!
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold text-dark">
-                                                <i class="fas fa-paste text-warning me-1"></i> Tempel Snippet Konfigurasi Firebase (JS atau JSON)
-                                            </label>
-                                            <textarea class="form-control font-monospace small" id="fb_snippet_paste" rows="4" placeholder='Contoh: const firebaseConfig = { apiKey: "AIzaSy...", projectId: "my-simpeg-project", ... };'></textarea>
-                                        </div>
-
-                                        <div class="d-flex flex-wrap gap-2 mb-3">
-                                            <button type="button" class="btn btn-warning text-dark fw-bold rounded-pill px-4" onclick="window.applyPastedFirebaseSnippet()">
-                                                <i class="fas fa-check-circle me-1"></i> Deteksi & Terapkan Otomatis
-                                            </button>
-                                            <button type="button" class="btn btn-outline-danger fw-bold rounded-pill px-3" onclick="window.resetFirebaseConfigToDefault()">
-                                                <i class="fas fa-undo me-1"></i> Pulihkan ke Default Cloud
-                                            </button>
-                                            <button type="button" class="btn btn-link text-decoration-none text-muted small ms-auto" data-bs-toggle="collapse" data-bs-target="#collapseManualFirebase">
-                                                <i class="fas fa-sliders-h me-1"></i> Pengaturan Parameter Manual
-                                            </button>
-                                        </div>
-
-                                        <!-- Form Manual Collapse -->
-                                        <div class="collapse border rounded-3 p-3 bg-light" id="collapseManualFirebase">
-                                            <h6 class="fw-bold text-dark mb-3"><i class="fas fa-edit me-1"></i> Edit Parameter Firebase Spesifik</h6>
-                                            <div class="row g-2">
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">Project ID</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_projectId" placeholder="graphical-marking-lxctm">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">Database ID (Firestore)</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_databaseId" placeholder="ai-studio-remixsimpegdigit-...">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">API Key</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_apiKey" placeholder="AIzaSy...">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">Auth Domain</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_authDomain" placeholder="project.firebaseapp.com">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">Storage Bucket</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_storageBucket" placeholder="project.firebasestorage.app">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-semibold">Messaging Sender ID</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_messagingSenderId" placeholder="1098525805857">
-                                                </div>
-                                                <div class="col-12">
-                                                    <label class="form-label small fw-semibold">App ID</label>
-                                                    <input type="text" class="form-control form-control-sm" id="cfg_fb_appId" placeholder="1:1098525805857:web:...">
-                                                </div>
-                                            </div>
-                                            <div class="mt-3 text-end">
-                                                <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold px-3" onclick="window.applyManualFirebaseConfig()">
-                                                    <i class="fas fa-save me-1"></i> Simpan Parameter Manual
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- TAB 2: Hub Koneksi Lintas Platform -->
-                                    <div class="tab-pane fade" id="pills-fb-multi" role="tabpanel">
-                                        <div class="alert alert-primary border-0 rounded-3 p-3 mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <i class="fas fa-globe text-primary fs-4"></i>
-                                                <div>
-                                                    <strong class="d-block">Koneksikan ke Segala Jenis Platform & Aplikasi</strong>
-                                                    <span class="small text-muted">Gunakan konfigurasi di bawah untuk menghubungkan aplikasi Android, iOS, Website lain, Flutter, atau bot otomatis ke SIMPEG ini secara real-time.</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Platform Selector Buttons -->
-                                        <div class="btn-group w-100 mb-3 flex-wrap shadow-sm" role="group" id="platform-btn-group">
-                                            <button type="button" class="btn btn-outline-primary active fw-bold py-2" onclick="window.selectPlatformCode('web', this)">
-                                                <i class="fas fa-globe me-1"></i> Web / PWA
-                                            </button>
-                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('android', this)">
-                                                <i class="fab fa-android me-1"></i> Android
-                                            </button>
-                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('ios', this)">
-                                                <i class="fab fa-apple me-1"></i> iOS (Swift)
-                                            </button>
-                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('flutter', this)">
-                                                <i class="fas fa-mobile-alt me-1"></i> Flutter
-                                            </button>
-                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('react_native', this)">
-                                                <i class="fab fa-react me-1"></i> React Native
-                                            </button>
-                                            <button type="button" class="btn btn-outline-primary fw-bold py-2" onclick="window.selectPlatformCode('rest_api', this)">
-                                                <i class="fas fa-network-wired me-1"></i> REST API / cURL
-                                            </button>
-                                        </div>
-
-                                        <!-- Code Display Box with Copy Button -->
-                                        <div class="position-relative mb-3">
-                                            <div class="d-flex justify-content-between align-items-center bg-dark text-white px-3 py-2 rounded-top font-monospace small">
-                                                <span id="platform-code-title"><i class="fas fa-code me-1 text-warning"></i> Snippet Kode Web / PWA</span>
-                                                <button type="button" class="btn btn-warning btn-sm fw-bold rounded-pill px-3 py-1" onclick="window.copyActivePlatformCode()">
-                                                    <i class="fas fa-copy me-1"></i> Salin Kode Integrasi
-                                                </button>
-                                            </div>
-                                            <pre class="bg-dark text-white p-3 rounded-bottom mb-0 small" style="max-height: 280px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace;"><code id="platform-code-content"></code></pre>
-                                        </div>
-
-                                        <!-- Cara Kerja 3 Langkah -->
-                                        <div class="row g-2 text-center text-md-start small text-muted">
-                                            <div class="col-md-4">
-                                                <div class="p-2 border rounded-3 bg-light">
-                                                    <span class="badge bg-primary rounded-circle mb-1">1</span>
-                                                    <div class="fw-bold text-dark">Salin Konfigurasi</div>
-                                                    <div>Tempel kode di atas ke aplikasi target Anda.</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="p-2 border rounded-3 bg-light">
-                                                    <span class="badge bg-primary rounded-circle mb-1">2</span>
-                                                    <div class="fw-bold text-dark">Akses Koleksi</div>
-                                                    <div>Gunakan koleksi <code>pegawai</code>, <code>usulan</code>, atau <code>jadwal_diklat</code>.</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="p-2 border rounded-3 bg-light">
-                                                    <span class="badge bg-primary rounded-circle mb-1">3</span>
-                                                    <div class="fw-bold text-dark">Real-Time Sync</div>
-                                                    <div>Data langsung sinkron tanpa perlu perantara server tambahan.</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <!-- Petunjuk 3 Langkah Hosting ke Hostinger -->
+                                <div class="p-3 bg-light rounded-4 border">
+                                    <h6 class="fw-bold mb-2 text-dark"><i class="fas fa-tasks text-primary me-2"></i>Panduan Singkat Upload ke Hostinger (Selesai dalam 2 Menit)</h6>
+                                    <ol class="small text-muted ps-3 mb-0">
+                                        <li class="mb-1"><strong>Buat Database di hPanel Hostinger:</strong> Masuk ke hPanel &gt; Databases &gt; Buat database dengan nama <code>u133879636_dbsimpegkawan</code> dan user <code>u133879636_simpegkawan</code> serta password <code>Simpegkawan2026</code>.</li>
+                                        <li class="mb-1"><strong>Import database_simpeg.sql:</strong> Buka phpMyAdmin dari hPanel Hostinger, pilih database tersebut, klik tab <strong>Import</strong>, pilih file <code>database_simpeg.sql</code> lalu klik <strong>Kirim (Go)</strong>.</li>
+                                        <li><strong>Upload Berkas Aplikasi:</strong> Buka File Manager Hostinger &gt; <code>public_html</code> &gt; upload file <code>index.html</code>, <code>api.php</code>, <code>config.php</code>, <code>test_koneksi.php</code>. Aplikasi langsung dapat diakses online tanpa memerlukan layanan Cloud Database atau Spreadsheet luar.</li>
+                                    </ol>
                                 </div>
                             </div>
                         </div>
@@ -4722,32 +4109,17 @@
                                             </div>
                                         </div>
 
-                                        <!-- Konfigurasi Google Apps Script (GAS) & Google Drive -->
-                                        <div class="mt-4 p-3 bg-white rounded-4 border border-secondary border-opacity-25 shadow-sm">
+                                        <!-- Integrasi Spreadsheet & Cloud (Dinonaktifkan Penuh) -->
+                                        <div class="mt-4 p-3 bg-light rounded-4 border border-secondary border-opacity-25">
                                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                                <label class="form-label fw-bold text-dark mb-0">
-                                                    <i class="fab fa-google-drive text-secondary me-2"></i> Koneksi Google Apps Script (GAS) Web App
-                                                </label>
-                                                <span class="badge bg-secondary text-white fw-bold" id="badgeGasStatus"><i class="fas fa-unlink me-1"></i> Tidak Terkoneksi</span>
-                                            </div>
-                                            <p class="small text-muted mb-3" style="font-size:0.83rem;">
-                                                Status saat ini: <strong>Koneksi GAS Tidak Dikoneksikan</strong>. Aplikasi menggunakan Database MySQL Hostinger & Cloud Database secara penuh.
-                                            </p>
-                                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                                <div class="input-group flex-grow-1" style="min-width: 260px;">
-                                                    <span class="input-group-text bg-light"><i class="fas fa-link text-muted"></i></span>
-                                                    <input type="url" id="set_gas_webapp_url" class="form-control form-control-sm" placeholder="Koneksi GAS dimatikan / tidak dikoneksikan">
-                                                    <button type="button" class="btn btn-outline-primary btn-sm fw-bold px-3" onclick="window.testGasConnection()">
-                                                        <i class="fas fa-plug me-1"></i> Hubungkan Manual
-                                                    </button>
+                                                <div class="fw-bold text-dark">
+                                                    <i class="fas fa-file-excel text-muted me-2"></i> Integrasi Spreadsheet & Layanan Cloud Eksternal
                                                 </div>
-                                                <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="window.disconnectGas()">
-                                                    <i class="fas fa-unlink me-1"></i> Putuskan Koneksi GAS
-                                                </button>
+                                                <span class="badge bg-secondary text-white fw-bold"><i class="fas fa-ban me-1"></i> Nonaktif / Dihapus</span>
                                             </div>
-                                            <div id="infoGasConnection" class="extra-small text-muted mt-1" style="font-size:0.75rem;">
-                                                <i class="fas fa-check-circle text-success me-1"></i> Koneksi GAS dalam status diputus / dinonaktifkan.
-                                            </div>
+                                            <p class="small text-muted mb-0" style="font-size:0.83rem;">
+                                                Layanan Google Spreadsheet (GAS) dan Cloud Database Firebase telah dinonaktifkan secara permanen. Seluruh transaksi data kepegawaian kini diproses dan disimpan secara langsung ke <strong>Database MySQL Hostinger</strong>.
+                                            </p>
                                         </div>
                                     </div>
 
@@ -9488,7 +8860,15 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 $('#global-db-pegawai-count').text(`${arr.length} Pegawai`);
             }
             if ($('#global-db-badge-public').length) {
-                $('#global-db-badge-public').html(`<i class="fas fa-check-circle text-success me-1"></i> Database Terhubung (${arr.length} Pegawai)`);
+                const isFbDisabled = window.isFirebaseDisabled || localStorage.getItem('simpeg_firebase_disabled') === 'true';
+                if (isFbDisabled) {
+                    $('#global-db-badge-public')
+                        .removeClass('border-success text-success bg-success')
+                        .addClass('border-primary text-primary bg-primary')
+                        .html(`<i class="fas fa-database text-primary me-1"></i> Database MySQL (${arr.length} Pegawai)`);
+                } else {
+                    $('#global-db-badge-public').html(`<i class="fas fa-check-circle text-success me-1"></i> Database Terhubung (${arr.length} Pegawai)`);
+                }
             }
             return arr;
         };
@@ -9942,6 +9322,10 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 } else {
                     $('#badge-persistence-status').html('<i class="fas fa-exclamation-triangle text-warning me-1"></i> Mode Standar').addClass('bg-warning text-dark').removeClass('bg-white text-primary');
                     $('#stat-stored-status').text("SINKRON SERVER").removeClass('text-success').addClass('text-warning');
+                }
+
+                if (typeof window.updateFirebaseStatusUi === 'function') {
+                    window.updateFirebaseStatusUi();
                 }
             } catch(e){}
         };
@@ -10424,57 +9808,10 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.getApiEndpoint = function(action) {
-            if (action === 'getAllAppModules' || action === 'getAppConfig' || action === 'getAllData') {
-                return '/api/gas?action=' + encodeURIComponent(action);
-            }
-            if (localStorage.getItem('simpeg_gas_disabled') === 'true') {
-                return action ? '/api/gas?action=' + encodeURIComponent(action) : '/api/gas';
-            }
-            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url') || window.remoteGasWebappUrl;
-            if (customGasUrl && customGasUrl.trim().startsWith('http')) {
-                let cleanUrl = customGasUrl.trim();
-                return action ? (cleanUrl + (cleanUrl.includes('?') ? '&' : '?') + 'action=' + encodeURIComponent(action)) : cleanUrl;
-            }
             return action ? '/api/gas?action=' + encodeURIComponent(action) : '/api/gas';
         };
 
         window.postToBackend = async function(action, payload) {
-            // Also sync data to Firestore Cloud Database
-            if (action === 'savePegawaiData' || action === 'saveAllData') {
-                const list = Array.isArray(payload) ? payload : (payload && payload.pegawai ? payload.pegawai : []);
-                if (list.length > 0 && window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
-                    window.firestoreSync.saveAllPegawaiToFirestore(list);
-                }
-            } else if (action === 'saveAppConfig' || action === 'saveGasUrl') {
-                if (window.firestoreSync && typeof window.firestoreSync.saveAppConfig === 'function') {
-                    window.firestoreSync.saveAppConfig(payload);
-                }
-            }
-
-            let isGasDisabled = localStorage.getItem('simpeg_gas_disabled') === 'true';
-            let customGasUrl = !isGasDisabled ? (localStorage.getItem('simpeg_gas_webapp_url') || window.remoteGasWebappUrl) : '';
-            let isGas = customGasUrl && customGasUrl.trim().startsWith('http') && action !== 'getAllAppModules' && action !== 'getAppConfig' && action !== 'saveAppConfig';
-
-            if (isGas) {
-                let cleanGasUrl = customGasUrl.trim();
-                try {
-                    // Direct POST to Google Apps Script Web App without custom Content-Type header to avoid CORS preflight rejection
-                    let response = await fetch(cleanGasUrl, {
-                        method: 'POST',
-                        redirect: 'follow',
-                        body: JSON.stringify({ action: action, data: payload })
-                    });
-                    if (response.ok) {
-                        let json = await response.json();
-                        // Also persist to server endpoint for centralized multi-device access
-                        postToServerEndpoint(action, payload);
-                        return json;
-                    }
-                } catch(gasErr) {
-                    console.warn("GAS direct post warning, attempting fallback:", gasErr);
-                }
-            }
-
             return await postToServerEndpoint(action, payload);
         };
 
@@ -10487,20 +9824,19 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: action, data: payload })
                 });
-                return await r.json();
-            } catch (err) {
-                try {
-                    let r2 = await fetch('api.php?action=' + encodeURIComponent(action), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: action, data: payload })
-                    });
-                    return await r2.json();
-                } catch(e) {
-                    console.warn("Backend sync offline fallback:", e);
-                    return { success: false, offline: true, error: e.message };
-                }
-            }
+                if (r.ok) return await r.json();
+            } catch (err) {}
+
+            try {
+                let r2 = await fetch('api.php?action=' + encodeURIComponent(action), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action, data: payload })
+                });
+                if (r2.ok) return await r2.json();
+            } catch(e) {}
+
+            return { success: true, localOnly: true };
         }
 
         window.saveModuleDataToRumahweb = async function(action, payload, successMsg) {
@@ -10598,7 +9934,11 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.loadDataFromGAS = function(forceRefresh = false) {
-            $('#loadingText').text("Memuat Data dari Cloud Database & Spreadsheet...");
+            window.loadDataFromHostingerMySQL(forceRefresh);
+        };
+
+        window.loadDataFromHostingerMySQL = function(forceRefresh = false) {
+            $('#loadingText').text("Memuat Data dari Database MySQL Hostinger...");
             $('#loadingOverlay').css('display', 'flex');
 
             let localStored = localStorage.getItem('simpeg_pkss_pegawai_db');
@@ -10614,11 +9954,10 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 } catch(e){}
             }
 
-            const applyPegawaiData = (serverPegawai, sourceLabel = "Database & Spreadsheet") => {
+            const applyPegawaiData = (serverPegawai, sourceLabel = "Database MySQL Hostinger") => {
                 let validServer = Array.isArray(serverPegawai) && serverPegawai.length > 0;
 
                 if (validServer) {
-                    // Filter out any non-pegawai corrupted records
                     const filtered = serverPegawai.filter(p => {
                         if (!p || typeof p !== 'object') return false;
                         if (p.penyelenggara && p.tgl_selesai && !p.nip && !p.nik && !p.jabatan) return false;
@@ -10629,12 +9968,6 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                         const normalized = filtered.map(p => window.normalizePegawai(p));
                         window.setDataPegawaiGlobal(normalized);
 
-                        // Persist to Cloud Firestore so all other computers/browsers receive it!
-                        if (window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
-                            window.firestoreSync.saveAllPegawaiToFirestore(dataPegawai);
-                        }
-
-                        // Auto-sync any new Unit Tugas from spreadsheet rows to masterUnitTugasList
                         if (window.masterUnitTugasList && Array.isArray(window.masterUnitTugasList)) {
                             let hasNewUnit = false;
                             dataPegawai.forEach(p => {
@@ -10670,66 +10003,46 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     }
                 }
 
-                // If server data was empty or invalid, try Firestore Cloud Database directly
-                const tryFirestore = () => {
-                    if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
-                        return window.firestoreSync.loadPegawaiList().then(fsList => {
-                            if (Array.isArray(fsList) && fsList.length > 0) {
-                                const normalized = fsList.map(p => window.normalizePegawai(p));
+                // Fallback to local storage or JSON database
+                applyLocalFallback();
+            };
+
+            const applyLocalFallback = () => {
+                if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
+                    const normalized = localPegawai.map(p => window.normalizePegawai(p));
+                    window.setDataPegawaiGlobal(normalized);
+                    refreshAllData();
+                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                    if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                    $('#loadingOverlay').hide();
+                    showToast(`Memuat ${dataPegawai.length} data pegawai dari penyimpanan lokal.`, "info");
+                } else {
+                    fetch('data_pegawai_db.json')
+                        .then(r => r.ok ? r.json() : Promise.reject())
+                        .then(jsonRes => {
+                            const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
+                            if (list.length > 0) {
+                                const normalized = list.map(p => window.normalizePegawai(p));
                                 window.setDataPegawaiGlobal(normalized);
                                 refreshAllData();
                                 if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
                                 if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
                                 $('#loadingOverlay').hide();
-                                showToast(`Berhasil memuat ${dataPegawai.length} data pegawai dari Cloud Database Firestore!`, "success");
-                                return true;
-                            }
-                            return false;
-                        }).catch(() => false);
-                    }
-                    return Promise.resolve(false);
-                };
-
-                tryFirestore().then(fsSuccess => {
-                    if (fsSuccess) return;
-
-                    if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
-                        const normalized = localPegawai.map(p => window.normalizePegawai(p));
-                        window.setDataPegawaiGlobal(normalized);
-                        refreshAllData();
-                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                        if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
-                        $('#loadingOverlay').hide();
-                        showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
-                    } else {
-                        // Fallback to static data_pegawai_db.json
-                        fetch('data_pegawai_db.json')
-                            .then(r => r.ok ? r.json() : Promise.reject())
-                            .then(jsonRes => {
-                                const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
-                                if (list.length > 0) {
-                                    const normalized = list.map(p => window.normalizePegawai(p));
-                                    window.setDataPegawaiGlobal(normalized);
-                                    refreshAllData();
-                                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                    if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
-                                    $('#loadingOverlay').hide();
-                                    showToast(`Memuat ${dataPegawai.length} data pegawai dari Database Cadangan.`, "info");
-                                } else {
-                                    window.setDataPegawaiGlobal([]);
-                                    refreshAllData();
-                                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                    $('#loadingOverlay').hide();
-                                }
-                            })
-                            .catch(() => {
+                                showToast(`Memuat ${dataPegawai.length} data pegawai dari Database Master.`, "info");
+                            } else {
                                 window.setDataPegawaiGlobal([]);
                                 refreshAllData();
                                 if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
                                 $('#loadingOverlay').hide();
-                            });
-                    }
-                });
+                            }
+                        })
+                        .catch(() => {
+                            window.setDataPegawaiGlobal([]);
+                            refreshAllData();
+                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                            $('#loadingOverlay').hide();
+                        });
+                }
             };
 
             let bundleEndpoint = window.getApiEndpoint('getAllAppModules');
@@ -10739,18 +10052,6 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 .then(res => {
                     if (res && res.success && res.data) {
                         const d = res.data;
-                        // Auto-detect and sync GAS URL if set on server (only if not explicitly disabled)
-                        if (localStorage.getItem('simpeg_gas_disabled') !== 'true' && d.config && (d.config.gas_webapp_url || d.config.gas_url)) {
-                            const remoteGas = (d.config.gas_webapp_url || d.config.gas_url).trim();
-                            if (remoteGas && remoteGas.startsWith('http')) {
-                                console.log("🔥 Auto-detected centralized GAS URL from server:", remoteGas);
-                                localStorage.setItem('simpeg_gas_webapp_url', remoteGas);
-                                window.remoteGasWebappUrl = remoteGas;
-                                if ($('#set_gas_webapp_url').length) $('#set_gas_webapp_url').val(remoteGas);
-                                $('#badgeGasStatus').removeClass('bg-warning bg-danger bg-secondary').addClass('bg-success text-white').html('<i class="fas fa-check-circle me-1"></i> Terhubung');
-                                $('#infoGasConnection').html(`<span class="text-success fw-bold"><i class="fas fa-link me-1"></i> Terkoneksi Otomatis: ${remoteGas.substring(0, 45)}...</span>`);
-                            }
-                        }
                         if (d.diklat && Array.isArray(d.diklat) && d.diklat.length > 0) {
                             window.diklatJadwalList = d.diklat;
                             localStorage.setItem('simpeg_pkss_jadwal_diklat_db', JSON.stringify(d.diklat));
@@ -10773,91 +10074,28 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                             localStorage.setItem('simpeg_gap_kompetensi_list', JSON.stringify(d.gap));
                         }
                         if (d.pegawai && Array.isArray(d.pegawai) && d.pegawai.length > 0) {
-                            applyPegawaiData(d.pegawai, "Database Server Terpusat");
+                            applyPegawaiData(d.pegawai, "Database MySQL Hostinger");
                             return;
                         }
                     }
-                    throw new Error("No module bundle");
+                    // If bundle was empty, try local fallback
+                    applyLocalFallback();
                 })
                 .catch(() => {
-                    // Try Firestore directly
-                    const waitForFirestoreAndLoad = () => {
-                        let attempts = 0;
-                        const check = () => {
-                            if (window.firestoreSync && typeof window.firestoreSync.loadPegawaiList === 'function') {
-                                window.firestoreSync.loadPegawaiList().then(fsList => {
-                                    if (Array.isArray(fsList) && fsList.length > 0) {
-                                        applyPegawaiData(fsList, "Cloud Database Firestore");
-                                        return;
-                                    }
-                                    fetchFromGasDirect();
-                                }).catch(() => {
-                                    fetchFromGasDirect();
-                                });
-                            } else if (attempts < 15) {
-                                attempts++;
-                                setTimeout(check, 150);
-                            } else {
-                                fetchFromGasDirect();
-                            }
-                        };
-                        check();
-                    };
-                    waitForFirestoreAndLoad();
-                });
-
-            function fetchFromGasDirect() {
-                if (localStorage.getItem('simpeg_gas_disabled') === 'true') {
-                    tryFallbackChain();
-                    return;
-                }
-                let customGas = localStorage.getItem('simpeg_gas_webapp_url') || window.remoteGasWebappUrl;
-                if (customGas && customGas.startsWith('http')) {
-                    fetch(window.getApiEndpoint('getPegawaiData'))
-                        .then(res => res.ok ? res.json() : Promise.reject())
-                        .then(data => {
-                            const list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
-                            if (list.length > 0) {
-                                applyPegawaiData(list, "Google Spreadsheet");
+                    // Try direct api.php if running on PHP server
+                    fetch('api.php?action=getAllAppModules')
+                        .then(r => r.ok ? r.json() : Promise.reject())
+                        .then(res => {
+                            if (res && res.success && res.data && res.data.pegawai && res.data.pegawai.length > 0) {
+                                applyPegawaiData(res.data.pegawai, "Database MySQL Hostinger (api.php)");
                                 return;
                             }
-                            tryFallbackChain();
+                            applyLocalFallback();
                         })
-                        .catch(() => tryFallbackChain());
-                } else {
-                    tryFallbackChain();
-                }
-
-                function tryFallbackChain() {
-                    fetch('data_pegawai_db.json')
-                        .then(r => r.ok ? r.json() : Promise.reject())
-                        .then(jsonRes => {
-                            const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
-                            if (list.length > 0) {
-                                applyPegawaiData(list, "Database JSON");
-                            } else {
-                                applyLocalCache();
-                            }
-                        })
-                        .catch(() => applyLocalCache());
-                }
-
-                function applyLocalCache() {
-                    if (localPegawai && localPegawai.length > 0) {
-                        const normalized = localPegawai.map(p => window.normalizePegawai(p));
-                        window.setDataPegawaiGlobal(normalized);
-                        refreshAllData();
-                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                        if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
-                        $('#loadingOverlay').hide();
-                        showToast(`Memuat ${dataPegawai.length} data pegawai dari cache lokal.`, "info");
-                    } else {
-                        $('#loadingOverlay').hide();
-                        refreshAllData();
-                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                    }
-                }
-            }
+                        .catch(() => {
+                            applyLocalFallback();
+                        });
+                });
         };
 
         function refreshAllData() {

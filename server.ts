@@ -11,6 +11,11 @@ const currentDir = typeof __dirname !== 'undefined'
 const app = express();
 const PORT = 3000;
 
+// Health check endpoint for container and dev server readiness
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -1593,6 +1598,28 @@ app.get('/database_simpeg.sql', (req, res) => {
   }
 });
 
+app.get('/test_koneksi.php', (req, res) => {
+  const filePath = path.join(process.cwd(), 'test_koneksi.php');
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="test_koneksi.php"');
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send('File test_koneksi.php tidak ditemukan.');
+  }
+});
+
+app.get('/PANDUAN_HOSTING_HOSTINGER.md', (req, res) => {
+  const filePath = path.join(process.cwd(), 'PANDUAN_HOSTING_HOSTINGER.md');
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="PANDUAN_HOSTING_HOSTINGER.md"');
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send('File PANDUAN_HOSTING_HOSTINGER.md tidak ditemukan.');
+  }
+});
+
 app.get('/PEDOMAN_DEPLOY_RUMAHWEB.md', (req, res) => {
   const filePath = path.join(process.cwd(), 'PEDOMAN_DEPLOY_RUMAHWEB.md');
   if (fs.existsSync(filePath)) {
@@ -1651,7 +1678,11 @@ async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR !== 'true',
+        watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -1663,8 +1694,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server SIMPEG Digital PKSS running on http://0.0.0.0:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[WARN] Port ${PORT} is already in use.`);
+    } else {
+      console.error('[ERROR] Server listen error:', err);
+    }
   });
 }
 
