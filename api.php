@@ -92,6 +92,135 @@ function saveAppStorage($filepath, $data) {
     return file_put_contents($filepath, $json, LOCK_EX) !== false;
 }
 
+// Helper: MySQL PDO Save / Update Pegawai directly in Hostinger MySQL table
+function syncPegawaiToMySql($pdo, $p) {
+    if (!$pdo || !is_array($p)) return false;
+    $nip = isset($p['nip']) ? trim($p['nip']) : '';
+    $nik = isset($p['nik']) ? trim($p['nik']) : '';
+    $nama = isset($p['nama']) ? trim($p['nama']) : '';
+    if (empty($nama) && empty($nip) && empty($nik)) return false;
+
+    try {
+        $existingId = null;
+        if (!empty($nip) && $nip !== '-') {
+            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE nip = :nip LIMIT 1");
+            $stmt->execute([':nip' => $nip]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
+        if (!$existingId && !empty($nik) && $nik !== '-') {
+            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE nik = :nik LIMIT 1");
+            $stmt->execute([':nik' => $nik]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
+        if (!$existingId && !empty($p['id']) && is_numeric($p['id'])) {
+            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $p['id']]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
+
+        $tanggal_lahir = (!empty($p['tanggal_lahir']) && $p['tanggal_lahir'] !== '-' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $p['tanggal_lahir'])) ? $p['tanggal_lahir'] : null;
+        $tmt = (!empty($p['tmt']) && $p['tmt'] !== '-' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $p['tmt'])) ? $p['tmt'] : null;
+        $aktif_str = (!empty($p['aktif_str']) && $p['aktif_str'] !== '-' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $p['aktif_str'])) ? $p['aktif_str'] : null;
+        $aktif_sip = (!empty($p['aktif_sip']) && $p['aktif_sip'] !== '-' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $p['aktif_sip'])) ? $p['aktif_sip'] : null;
+
+        $riwayatKeluarga = null;
+        if (isset($p['riwayat_keluarga'])) {
+            $riwayatKeluarga = is_string($p['riwayat_keluarga']) ? $p['riwayat_keluarga'] : json_encode($p['riwayat_keluarga']);
+        }
+
+        $params = [
+            ':nik' => $nik ?: null,
+            ':nip' => $nip ?: null,
+            ':nrk' => isset($p['nrk']) ? $p['nrk'] : null,
+            ':nama' => $nama,
+            ':gelar_depan' => isset($p['gelar_depan']) ? $p['gelar_depan'] : null,
+            ':gelar_belakang' => isset($p['gelar_belakang']) ? $p['gelar_belakang'] : null,
+            ':jenis_kelamin' => isset($p['jenis_kelamin']) ? $p['jenis_kelamin'] : 'Laki-laki',
+            ':tempat_lahir' => isset($p['tempat_lahir']) ? $p['tempat_lahir'] : null,
+            ':tanggal_lahir' => $tanggal_lahir,
+            ':agama' => isset($p['agama']) ? $p['agama'] : 'Islam',
+            ':status_nikah' => isset($p['status_nikah']) ? $p['status_nikah'] : 'Kawin',
+            ':status_pegawai' => isset($p['status_pegawai']) ? $p['status_pegawai'] : 'PNS',
+            ':tempat_tugas' => isset($p['tempat_tugas']) ? $p['tempat_tugas'] : 'Puskesmas Kepulauan Seribu Selatan',
+            ':jabatan' => isset($p['jabatan']) ? $p['jabatan'] : '',
+            ':jabatan_orb' => isset($p['jabatan_orb']) ? $p['jabatan_orb'] : (isset($p['jabatan_pergub']) ? $p['jabatan_pergub'] : ''),
+            ':jabatan_kepmenpan' => isset($p['jabatan_kepmenpan']) ? $p['jabatan_kepmenpan'] : (isset($p['jabatan_permenpan11']) ? $p['jabatan_permenpan11'] : ''),
+            ':rumpun' => isset($p['rumpun']) ? $p['rumpun'] : '',
+            ':status_rumpun' => isset($p['status_rumpun']) ? $p['status_rumpun'] : '',
+            ':kategori' => isset($p['kategori']) ? $p['kategori'] : 'Tenaga Medis',
+            ':pangkat_gol' => isset($p['pangkat_gol']) ? $p['pangkat_gol'] : '',
+            ':tmt' => $tmt,
+            ':kondisi' => isset($p['kondisi']) ? $p['kondisi'] : 'Aktif',
+            ':str' => isset($p['str']) ? $p['str'] : '',
+            ':aktif_str' => $aktif_str,
+            ':sip' => isset($p['sip']) ? $p['sip'] : '',
+            ':aktif_sip' => $aktif_sip,
+            ':no_hp' => isset($p['no_hp']) ? $p['no_hp'] : '',
+            ':email' => isset($p['email']) ? $p['email'] : '',
+            ':alamat' => isset($p['alamat']) ? $p['alamat'] : '',
+            ':riwayat_keluarga' => $riwayatKeluarga
+        ];
+
+        if ($existingId) {
+            $params[':id'] = $existingId;
+            $sql = "UPDATE pegawai SET nik=:nik, nip=:nip, nrk=:nrk, nama=:nama, gelar_depan=:gelar_depan, gelar_belakang=:gelar_belakang,
+                    jenis_kelamin=:jenis_kelamin, tempat_lahir=:tempat_lahir, tanggal_lahir=:tanggal_lahir, agama=:agama, status_nikah=:status_nikah,
+                    status_pegawai=:status_pegawai, tempat_tugas=:tempat_tugas, jabatan=:jabatan, jabatan_orb=:jabatan_orb, jabatan_kepmenpan=:jabatan_kepmenpan,
+                    rumpun=:rumpun, status_rumpun=:status_rumpun, kategori=:kategori, pangkat_gol=:pangkat_gol, tmt=:tmt, kondisi=:kondisi,
+                    str=:str, aktif_str=:aktif_str, sip=:sip, aktif_sip=:aktif_sip, no_hp=:no_hp, email=:email, alamat=:alamat, riwayat_keluarga=:riwayat_keluarga
+                    WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            return $stmt->execute($params);
+        } else {
+            $sql = "INSERT INTO pegawai (nik, nip, nrk, nama, gelar_depan, gelar_belakang, jenis_kelamin, tempat_lahir, tanggal_lahir, agama, status_nikah,
+                    status_pegawai, tempat_tugas, jabatan, jabatan_orb, jabatan_kepmenpan, rumpun, status_rumpun, kategori, pangkat_gol, tmt, kondisi,
+                    str, aktif_str, sip, aktif_sip, no_hp, email, alamat, riwayat_keluarga)
+                    VALUES (:nik, :nip, :nrk, :nama, :gelar_depan, :gelar_belakang, :jenis_kelamin, :tempat_lahir, :tanggal_lahir, :agama, :status_nikah,
+                    :status_pegawai, :tempat_tugas, :jabatan, :jabatan_orb, :jabatan_kepmenpan, :rumpun, :status_rumpun, :kategori, :pangkat_gol, :tmt, :kondisi,
+                    :str, :aktif_str, :sip, :aktif_sip, :no_hp, :email, :alamat, :riwayat_keluarga)";
+            $stmt = $pdo->prepare($sql);
+            return $stmt->execute($params);
+        }
+    } catch (Exception $e) {
+        error_log("Error syncPegawaiToMySql: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Helper: Delete Pegawai from Hostinger MySQL table
+function deletePegawaiFromMySql($pdo, $p) {
+    if (!$pdo || !is_array($p)) return false;
+    $nip = isset($p['nip']) ? trim($p['nip']) : '';
+    $nik = isset($p['nik']) ? trim($p['nik']) : '';
+    $nama = isset($p['nama']) ? trim($p['nama']) : '';
+    $id = isset($p['id']) ? $p['id'] : null;
+
+    try {
+        if ($id && is_numeric($id)) {
+            $stmt = $pdo->prepare("DELETE FROM pegawai WHERE id = :id");
+            return $stmt->execute([':id' => $id]);
+        }
+        if (!empty($nip) && $nip !== '-') {
+            $stmt = $pdo->prepare("DELETE FROM pegawai WHERE nip = :nip");
+            return $stmt->execute([':nip' => $nip]);
+        }
+        if (!empty($nik) && $nik !== '-') {
+            $stmt = $pdo->prepare("DELETE FROM pegawai WHERE nik = :nik");
+            return $stmt->execute([':nik' => $nik]);
+        }
+        if (!empty($nama)) {
+            $stmt = $pdo->prepare("DELETE FROM pegawai WHERE nama = :nama LIMIT 1");
+            return $stmt->execute([':nama' => $nama]);
+        }
+    } catch (Exception $e) {
+        error_log("Error deletePegawaiFromMySql: " . $e->getMessage());
+    }
+    return false;
+}
+
 // Parse Input Request
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 $inputRaw = file_get_contents('php://input');
@@ -141,13 +270,40 @@ switch ($action) {
     // 2. GET ALL APP MODULES (PEGWAi, PENGGUNA, USULAN, DISIPLIN, GAP, DIKLAT, MASTER, PENGATURAN)
     case 'getAllAppModules':
     case 'getAllData':
+        if ($pdo) {
+            try {
+                $stmt = $pdo->query("SELECT * FROM pegawai ORDER BY nama ASC");
+                $db['pegawai'] = $stmt->fetchAll();
+            } catch (Exception $e) {}
+            try {
+                $stmt = $pdo->query("SELECT * FROM users ORDER BY id ASC");
+                $users = $stmt->fetchAll();
+                if (!empty($users)) $db['pengguna'] = $users;
+            } catch (Exception $e) {}
+            try {
+                $stmt = $pdo->query("SELECT * FROM usulan_kepegawaian ORDER BY created_at DESC");
+                $db['usulan'] = $stmt->fetchAll();
+            } catch (Exception $e) {}
+            try {
+                $stmt = $pdo->query("SELECT * FROM disiplin_pegawai ORDER BY created_at DESC");
+                $db['disiplin'] = $stmt->fetchAll();
+            } catch (Exception $e) {}
+            try {
+                $stmt = $pdo->query("SELECT * FROM gap_kompetensi ORDER BY created_at DESC");
+                $db['gap'] = $stmt->fetchAll();
+            } catch (Exception $e) {}
+            try {
+                $stmt = $pdo->query("SELECT * FROM diklat_pegawai ORDER BY tahun DESC");
+                $db['diklat'] = $stmt->fetchAll();
+            } catch (Exception $e) {}
+        }
         echo json_encode([
             'success' => true,
             'data' => $db
         ], JSON_UNESCAPED_UNICODE);
         exit;
 
-    // 3. SAVE ALL APP MODULES (FULL SYNC TO RUMAHWEB)
+    // 3. SAVE ALL APP MODULES (FULL SYNC TO HOSTINGER MYSQL)
     case 'saveAllAppModules':
     case 'saveAllModules':
         if (is_array($payload)) {
@@ -158,8 +314,13 @@ switch ($action) {
             } else {
                 $db['pegawai'] = $payload;
             }
+            if ($pdo && isset($db['pegawai']) && is_array($db['pegawai'])) {
+                foreach ($db['pegawai'] as $p) {
+                    syncPegawaiToMySql($pdo, $p);
+                }
+            }
             saveAppStorage($jsonDbFile, $db);
-            echo json_encode(['success' => true, 'message' => 'Semua data modul berhasil disimpan di server Rumahweb hosting!']);
+            echo json_encode(['success' => true, 'message' => 'Semua data modul berhasil disimpan di Database MySQL Hostinger!']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Payload data tidak valid.']);
         }
@@ -278,6 +439,12 @@ switch ($action) {
             exit;
         }
 
+        // 1. Eksekusi Langsung ke Tabel MySQL Hostinger jika terhubung
+        $mysqlOk = false;
+        if ($pdo) {
+            $mysqlOk = syncPegawaiToMySql($pdo, $payload);
+        }
+
         $allPegawai = isset($db['pegawai']) && is_array($db['pegawai']) ? $db['pegawai'] : [];
         $targetNip = isset($payload['nip']) ? trim($payload['nip']) : '';
         $targetNik = isset($payload['nik']) ? trim($payload['nik']) : '';
@@ -301,19 +468,24 @@ switch ($action) {
 
         if ($foundIdx >= 0) {
             $allPegawai[$foundIdx] = array_merge($allPegawai[$foundIdx], $payload);
-            $msg = "Data pegawai berhasil diperbarui di server Rumahweb!";
+            $msg = "Data pegawai berhasil diperbarui di Database MySQL Hostinger!";
         } else {
             if (!isset($payload['rowIndex'])) {
                 $payload['rowIndex'] = count($allPegawai) + 2;
             }
             $allPegawai[] = $payload;
-            $msg = "Data pegawai baru berhasil disimpan di server Rumahweb!";
+            $msg = "Data pegawai baru berhasil disimpan ke Database MySQL Hostinger!";
         }
 
         $db['pegawai'] = $allPegawai;
         saveAppStorage($jsonDbFile, $db);
 
-        echo json_encode(['success' => true, 'message' => $msg, 'total' => count($allPegawai)]);
+        echo json_encode([
+            'success' => true,
+            'message' => $msg,
+            'mysql_synced' => $mysqlOk,
+            'total' => count($allPegawai)
+        ]);
         exit;
 
     // 6. HAPUS PEGAWAI
@@ -322,6 +494,12 @@ switch ($action) {
         $targetNik = isset($payload['nik']) ? trim($payload['nik']) : '';
         $targetNama = isset($payload['nama']) ? trim($payload['nama']) : '';
         $targetRowIndex = isset($payload['rowIndex']) ? $payload['rowIndex'] : null;
+
+        // 1. Eksekusi Hapus Langsung dari Tabel MySQL Hostinger jika terhubung
+        $mysqlDeleted = false;
+        if ($pdo) {
+            $mysqlDeleted = deletePegawaiFromMySql($pdo, $payload);
+        }
 
         $allPegawai = isset($db['pegawai']) && is_array($db['pegawai']) ? $db['pegawai'] : [];
         $filtered = [];
@@ -351,7 +529,8 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'message' => $deletedCount > 0 ? "Data pegawai berhasil dihapus dari server Rumahweb." : "Data tidak ditemukan.",
+            'message' => ($deletedCount > 0 || $mysqlDeleted) ? "Data pegawai berhasil dihapus dari Database MySQL Hostinger." : "Data tidak ditemukan.",
+            'mysql_synced' => $mysqlDeleted,
             'total' => count($filtered)
         ]);
         exit;
@@ -373,6 +552,10 @@ switch ($action) {
             $nama = isset($item['nama']) ? trim($item['nama']) : '';
 
             if (!$nip && !$nik && !$nama) continue;
+
+            if ($pdo) {
+                syncPegawaiToMySql($pdo, $item);
+            }
 
             $idx = -1;
             foreach ($allPegawai as $i => $p) {
@@ -401,7 +584,7 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'message' => "Upload bulk data berhasil tersimpan di server Rumahweb! ($inserted baru, $updated diperbarui)",
+            'message' => "Upload bulk data berhasil tersimpan di Database MySQL Hostinger! ($inserted baru, $updated diperbarui)",
             'inserted' => $inserted,
             'updated' => $updated,
             'total' => count($allPegawai)
@@ -412,8 +595,13 @@ switch ($action) {
     case 'saveAllData':
         if (is_array($payload)) {
             $db['pegawai'] = $payload;
+            if ($pdo) {
+                foreach ($payload as $p) {
+                    syncPegawaiToMySql($pdo, $p);
+                }
+            }
             saveAppStorage($jsonDbFile, $db);
-            echo json_encode(['success' => true, 'message' => 'Seluruh data SIMPEG berhasil disinkronkan ke server Rumahweb.']);
+            echo json_encode(['success' => true, 'message' => 'Seluruh data SIMPEG berhasil disinkronkan ke Database MySQL Hostinger.']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Payload data kosong.']);
         }

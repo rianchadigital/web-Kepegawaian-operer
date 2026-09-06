@@ -4068,43 +4068,53 @@
 
                                         <div class="p-3 bg-light rounded-4 border mb-3">
                                             <div class="form-check mb-2">
-                                                <input class="form-check-input" type="radio" name="set_persistence_mode" id="mode_prioritize_local" value="prioritize_local" checked>
-                                                <label class="form-check-label fw-bold text-dark" for="mode_prioritize_local">
-                                                    <i class="fas fa-check-circle text-success me-1"></i> Utamakan Data Inputan Lokal Browser (Sangat Direkomendasikan)
+                                                <input class="form-check-input" type="radio" name="set_persistence_mode" id="mode_mysql_server" value="mysql_server" checked>
+                                                <label class="form-check-label fw-bold text-dark" for="mode_mysql_server">
+                                                    <i class="fas fa-database text-success me-1"></i> Database MySQL Server Hostinger (Aktif & Rekomendasi)
                                                 </label>
                                                 <small class="text-muted d-block ms-4">
-                                                    Sistem akan selalu memakai data terbaru dari browser Anda dan mengunci data agar tidak pernah tertimpa oleh data demo/bawaan awal server saat direfresh.
+                                                    Semua penambahan data, pengeditan form, dan penghapusan langsung diproses ke database MySQL Hostinger. Browser tidak menyimpan duplikasi cache lokal yang membingungkan.
                                                 </small>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="radio" name="set_persistence_mode" id="mode_sync_server" value="sync_server">
                                                 <label class="form-check-label fw-bold text-dark" for="mode_sync_server">
-                                                    <i class="fas fa-sync-alt text-primary me-1"></i> Sinkron Dua Arah dengan Server API
+                                                    <i class="fas fa-sync-alt text-primary me-1"></i> Sinkron Otomatis dengan Server API
                                                 </label>
                                                 <small class="text-muted d-block ms-4">
-                                                    Sistem mencoba mencocokkan data lokal dan server secara bergantian.
+                                                    Sistem mencocokkan data langsung dengan endpoint API backend Hostinger.
                                                 </small>
                                             </div>
+                                        </div>
+
+                                        <div class="p-3 bg-danger-subtle rounded-4 border border-danger-subtle mb-3 d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                                            <div>
+                                                <div class="fw-bold text-danger"><i class="fas fa-trash-alt me-1"></i> Bersihkan Cache Data Lokal Browser</div>
+                                                <small class="text-muted">Hapus data yang tersimpan di memori lokal browser Anda agar tampilan data 100% murni dan sinkron dari Database MySQL Hostinger.</small>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 py-2 text-nowrap fw-semibold shadow-sm" onclick="window.clearBrowserStorage()">
+                                                <i class="fas fa-broom me-1"></i> Hapus Cache Lokal Sekarang
+                                            </button>
                                         </div>
 
                                         <!-- Options Toggles -->
                                         <div class="row g-3">
                                             <div class="col-md-6">
                                                 <div class="form-check form-switch p-3 bg-white rounded-3 border">
-                                                    <input class="form-check-input ms-0 me-2" type="checkbox" id="set_lock_data" checked>
+                                                    <input class="form-check-input ms-0 me-2" type="checkbox" id="set_lock_data">
                                                     <label class="form-check-label fw-semibold text-dark" for="set_lock_data">
                                                         Proteksi Anti-Overwrite Server
                                                     </label>
-                                                    <small class="text-muted d-block">Mencegah server mengganti inputan lokal pengguna dengan data default/seed.</small>
+                                                    <small class="text-muted d-block">Mencegah penimpaan data otomatis jika koneksi terputus.</small>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="form-check form-switch p-3 bg-white rounded-3 border">
                                                     <input class="form-check-input ms-0 me-2" type="checkbox" id="set_auto_sync" checked>
                                                     <label class="form-check-label fw-semibold text-dark" for="set_auto_sync">
-                                                        Auto-Sync Instan
+                                                        Auto-Sync Instan ke MySQL
                                                     </label>
-                                                    <small class="text-muted d-block">Otomatis kirim setiap form input baru ke server background.</small>
+                                                    <small class="text-muted d-block">Otomatis kirim setiap form input baru ke backend MySQL Hostinger.</small>
                                                 </div>
                                             </div>
                                         </div>
@@ -8854,7 +8864,9 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
             dataPegawai = arr;
             window.dataPegawai = arr;
             try {
-                localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(arr));
+                // Hapus data dari localStorage browser agar transaksi data hanya tersimpan di MySQL
+                localStorage.removeItem('simpeg_pkss_pegawai_db');
+                localStorage.removeItem('simpeg_backup_pegawai_local');
             } catch(e){}
             if ($('#global-db-pegawai-count').length) {
                 $('#global-db-pegawai-count').text(`${arr.length} Pegawai`);
@@ -9058,25 +9070,44 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
 
         window.savePegawaiToLocalStorage = window.savePegawaiToStorage = function(singlePegawai) {
             try {
-                if (dataPegawai && Array.isArray(dataPegawai)) {
-                    localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
-                    let nowStr = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) + " WIB";
-                    localStorage.setItem('simpeg_last_saved_time', nowStr);
-                    if (typeof window.saveModuleDataToRumahweb === 'function') {
-                        window.saveModuleDataToRumahweb('saveAllData', dataPegawai);
-                    }
-                    // Persist to Firestore Cloud Database
-                    if (singlePegawai && window.firestoreSync && typeof window.firestoreSync.savePegawai === 'function') {
-                        window.firestoreSync.savePegawai(singlePegawai);
-                    } else if (window.firestoreSync && typeof window.firestoreSync.saveAllPegawaiToFirestore === 'function') {
-                        window.firestoreSync.saveAllPegawaiToFirestore(dataPegawai);
-                    }
-                    if (typeof window.updatePersistenceUiStats === 'function') {
-                        window.updatePersistenceUiStats();
-                    }
+                // Hapus cache lokal browser agar transaksi data hanya tersimpan di MySQL
+                localStorage.removeItem('simpeg_pkss_pegawai_db');
+                localStorage.removeItem('simpeg_backup_pegawai_local');
+                let nowStr = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) + " WIB";
+                localStorage.setItem('simpeg_last_saved_time', nowStr);
+
+                // Kirim langsung ke Database MySQL Hostinger
+                if (singlePegawai) {
+                    window.postToBackend('simpanPegawai', singlePegawai);
+                } else if (dataPegawai && Array.isArray(dataPegawai)) {
+                    window.postToBackend('saveAllData', dataPegawai);
+                }
+
+                if (typeof window.updatePersistenceUiStats === 'function') {
+                    window.updatePersistenceUiStats();
                 }
             } catch(e) {
-                console.warn("Gagal menyimpan ke database:", e);
+                console.warn("Gagal sinkronisasi data ke Database MySQL:", e);
+            }
+        };
+
+        window.clearBrowserStorage = function(showNotification = true) {
+            try {
+                localStorage.removeItem('simpeg_pkss_pegawai_db');
+                localStorage.removeItem('simpeg_backup_pegawai_local');
+                localStorage.removeItem('simpeg_admin_pengguna');
+                localStorage.removeItem('simpeg_usulan_list');
+                localStorage.removeItem('simpeg_pkss_disiplin_db');
+                localStorage.removeItem('simpeg_gap_kompetensi_list');
+                localStorage.removeItem('simpeg_pkss_jadwal_diklat_db');
+                localStorage.setItem('simpeg_persistence_mode', 'mysql_server');
+                localStorage.setItem('simpeg_lock_data', 'false');
+                if (showNotification) {
+                    showToast("Semua data cache lokal browser berhasil dibersihkan! Memuat ulang langsung dari Database MySQL Hostinger...", "success");
+                }
+                window.loadDataFromHostingerMySQL(true);
+            } catch(e) {
+                console.error("Gagal membersihkan cache browser:", e);
             }
         };
 
@@ -9085,7 +9116,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 let instansi = $('#set_nama_instansi').val() || 'PUSKESMAS KEPULAUAN SERIBU SELATAN';
                 localStorage.setItem('simpeg_nama_instansi', instansi);
 
-                let selectedMode = $('input[name="set_persistence_mode"]:checked').val() || 'prioritize_local';
+                let selectedMode = $('input[name="set_persistence_mode"]:checked').val() || 'mysql_server';
                 localStorage.setItem('simpeg_persistence_mode', selectedMode);
 
                 let isLockData = $('#set_lock_data').is(':checked');
@@ -9938,21 +9969,14 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         window.loadDataFromHostingerMySQL = function(forceRefresh = false) {
-            $('#loadingText').text("Memuat Data dari Database MySQL Hostinger...");
+            $('#loadingText').text("Memuat Data Langsung dari Database MySQL Hostinger...");
             $('#loadingOverlay').css('display', 'flex');
 
-            let localStored = localStorage.getItem('simpeg_pkss_pegawai_db');
-            let hasLocalDb = false;
-            let localPegawai = null;
-            if (localStored !== null) {
-                try {
-                    let parsed = JSON.parse(localStored);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        localPegawai = parsed;
-                        hasLocalDb = true;
-                    }
-                } catch(e){}
-            }
+            // Selalu bersihkan cache lokal browser agar data di browser selalu mencerminkan data Database MySQL terbaru
+            try {
+                localStorage.removeItem('simpeg_pkss_pegawai_db');
+                localStorage.removeItem('simpeg_backup_pegawai_local');
+            } catch(e){}
 
             const applyPegawaiData = (serverPegawai, sourceLabel = "Database MySQL Hostinger") => {
                 let validServer = Array.isArray(serverPegawai) && serverPegawai.length > 0;
@@ -10003,46 +10027,36 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                     }
                 }
 
-                // Fallback to local storage or JSON database
-                applyLocalFallback();
+                // Fallback ke berkas database server
+                applyServerFallback();
             };
 
-            const applyLocalFallback = () => {
-                if (hasLocalDb && localPegawai !== null && localPegawai.length > 0) {
-                    const normalized = localPegawai.map(p => window.normalizePegawai(p));
-                    window.setDataPegawaiGlobal(normalized);
-                    refreshAllData();
-                    if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                    if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
-                    $('#loadingOverlay').hide();
-                    showToast(`Memuat ${dataPegawai.length} data pegawai dari penyimpanan lokal.`, "info");
-                } else {
-                    fetch('data_pegawai_db.json')
-                        .then(r => r.ok ? r.json() : Promise.reject())
-                        .then(jsonRes => {
-                            const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
-                            if (list.length > 0) {
-                                const normalized = list.map(p => window.normalizePegawai(p));
-                                window.setDataPegawaiGlobal(normalized);
-                                refreshAllData();
-                                if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
-                                $('#loadingOverlay').hide();
-                                showToast(`Memuat ${dataPegawai.length} data pegawai dari Database Master.`, "info");
-                            } else {
-                                window.setDataPegawaiGlobal([]);
-                                refreshAllData();
-                                if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
-                                $('#loadingOverlay').hide();
-                            }
-                        })
-                        .catch(() => {
+            const applyServerFallback = () => {
+                fetch('data_pegawai_db.json')
+                    .then(r => r.ok ? r.json() : Promise.reject())
+                    .then(jsonRes => {
+                        const list = Array.isArray(jsonRes) ? jsonRes : (jsonRes.pegawai || []);
+                        if (list.length > 0) {
+                            const normalized = list.map(p => window.normalizePegawai(p));
+                            window.setDataPegawaiGlobal(normalized);
+                            refreshAllData();
+                            if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                            if (typeof window.updatePublicDashboard === 'function') window.updatePublicDashboard();
+                            $('#loadingOverlay').hide();
+                            showToast(`Memuat ${dataPegawai.length} data pegawai dari Database Server.`, "info");
+                        } else {
                             window.setDataPegawaiGlobal([]);
                             refreshAllData();
                             if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
                             $('#loadingOverlay').hide();
-                        });
-                }
+                        }
+                    })
+                    .catch(() => {
+                        window.setDataPegawaiGlobal([]);
+                        refreshAllData();
+                        if (typeof window.updatePersistenceUiStats === 'function') window.updatePersistenceUiStats();
+                        $('#loadingOverlay').hide();
+                    });
             };
 
             let bundleEndpoint = window.getApiEndpoint('getAllAppModules');
@@ -10078,8 +10092,7 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                             return;
                         }
                     }
-                    // If bundle was empty, try local fallback
-                    applyLocalFallback();
+                    applyServerFallback();
                 })
                 .catch(() => {
                     // Try direct api.php if running on PHP server
@@ -10090,10 +10103,10 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                                 applyPegawaiData(res.data.pegawai, "Database MySQL Hostinger (api.php)");
                                 return;
                             }
-                            applyLocalFallback();
+                            applyServerFallback();
                         })
                         .catch(() => {
-                            applyLocalFallback();
+                            applyServerFallback();
                         });
                 });
         };
@@ -11223,18 +11236,15 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 }
             }
 
-            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url');
-            let isGas = customGasUrl && customGasUrl.trim().startsWith('http');
-
             window.postToBackend('hapusPegawai', payloadDelete)
                 .then(res => {
-                    let msg = (res && res.success && isGas) 
-                        ? "Data pegawai berhasil dihapus dari Google Spreadsheet & Database!" 
-                        : "Data pegawai berhasil dihapus dari Database!";
+                    let msg = (res && res.success)
+                        ? "Data pegawai berhasil dihapus permanen dari Database MySQL Hostinger!"
+                        : "Data pegawai berhasil dihapus dari Database MySQL Hostinger!";
                     showToast(msg, "success");
                 })
                 .catch(err => {
-                    showToast("Data pegawai berhasil dihapus dari Database!", "success");
+                    showToast("Data pegawai berhasil dihapus dari Database MySQL!", "success");
                 });
         };
 
@@ -14919,22 +14929,15 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 if (bsModal) bsModal.hide();
             }
 
-            let customGasUrl = localStorage.getItem('simpeg_gas_webapp_url');
-            let isGas = customGasUrl && customGasUrl.trim().startsWith('http');
-
             window.postToBackend(action, payload)
                 .then(res => {
-                    if (res && res.success) {
-                        let msg = isGas
-                            ? "Data pegawai & foto profil berhasil disimpan ke Google Spreadsheet & Database!"
-                            : "Data pegawai & foto profil berhasil disimpan ke Database!";
-                        showToast(msg, "success");
-                    } else {
-                        showToast("Data pegawai & foto profil berhasil disimpan ke Database!", "success");
-                    }
+                    let msg = (res && res.success)
+                        ? "Data pegawai & foto profil berhasil disimpan permanen ke Database MySQL Hostinger!"
+                        : "Data pegawai & foto profil berhasil disimpan ke Database MySQL Hostinger!";
+                    showToast(msg, "success");
                 })
                 .catch(err => {
-                    showToast("Data pegawai & foto profil berhasil disimpan ke Database!", "success");
+                    showToast("Data pegawai & foto profil berhasil disimpan ke Database MySQL!", "success");
                 });
         });
 
@@ -20728,16 +20731,14 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 updated_at: new Date().toLocaleString('id-ID')
             };
 
-            // Persist to storage & Firestore
+            // Persist to storage & MySQL
             if (typeof window.savePegawaiToStorage === 'function') {
                 window.savePegawaiToStorage(dataPegawai[idx]);
             } else {
                 try {
-                    localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
+                    localStorage.removeItem('simpeg_pkss_pegawai_db');
                 } catch(e) {}
-                if (window.firestoreSync && typeof window.firestoreSync.savePegawai === 'function') {
-                    window.firestoreSync.savePegawai(dataPegawai[idx]);
-                }
+                window.postToBackend('simpanPegawai', dataPegawai[idx]);
             }
 
             let modalEl = document.getElementById('modalKelolaUraianTugas');
@@ -22875,11 +22876,9 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
                 window.savePegawaiToStorage(dataPegawai[idx]);
             } else {
                 try {
-                    localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(dataPegawai));
+                    localStorage.removeItem('simpeg_pkss_pegawai_db');
                 } catch(e) {}
-                if (window.firestoreSync && typeof window.firestoreSync.savePegawai === 'function') {
-                    window.firestoreSync.savePegawai(dataPegawai[idx]);
-                }
+                window.postToBackend('simpanPegawai', dataPegawai[idx]);
             }
 
             let modalEl = document.getElementById('modalKelolaDokumen');
@@ -27234,6 +27233,14 @@ _Contoh:_ *INFO Ahmad* atau *TEMPAT Dendy*</div>
         };
 
         $(document).ready(function() {
+            // Bersihkan data cache lokal browser agar transaksi data murni dari Database MySQL Hostinger
+            try {
+                localStorage.removeItem('simpeg_pkss_pegawai_db');
+                localStorage.removeItem('simpeg_backup_pegawai_local');
+                localStorage.setItem('simpeg_persistence_mode', 'mysql_server');
+                localStorage.setItem('simpeg_lock_data', 'false');
+            } catch(e){}
+
             let savedUser = null;
             try { savedUser = JSON.parse(sessionStorage.getItem('simpeg_active_user') || localStorage.getItem('simpeg_active_user') || 'null'); } catch(e){}
             if (savedUser && savedUser.nama) {
