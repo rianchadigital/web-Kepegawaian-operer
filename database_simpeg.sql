@@ -127,11 +127,120 @@ CREATE TABLE IF NOT EXISTS `master_unit_tugas` (
 
 INSERT INTO `master_unit_tugas` (`id`, `nama`, `status`) VALUES
 (1, 'Puskesmas Kepulauan Seribu Selatan', 'Aktif'),
-(2, 'Puskesmas Pembantu Pulau Tidung', 'Aktif'),
-(3, 'Puskesmas Pembantu Pulau Pari', 'Aktif'),
-(4, 'Puskesmas Pembantu Pulau Untung Jawa', 'Aktif'),
-(5, 'Puskesmas Pembantu Pulau Lancang', 'Aktif'),
-(6, 'Puskesmas Pembantu Pulau Payung', 'Aktif');
+(2, 'Pustu Pulau Lancang', 'Aktif'),
+(3, 'Pustu Pulau Untung Jawa', 'Aktif'),
+(4, 'Pustu Pulau Pari', 'Aktif');
+
+-- --------------------------------------------------------
+-- TABEL MASTER PANGKAT & GOLONGAN RUANG
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `master_pangkat_golongan`;
+CREATE TABLE IF NOT EXISTS `master_pangkat_golongan` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `golongan` VARCHAR(20) NOT NULL UNIQUE,
+  `pangkat` VARCHAR(100) NOT NULL,
+  `status` ENUM('Aktif', 'Tidak Aktif') NOT NULL DEFAULT 'Aktif'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `master_pangkat_golongan` (`id`, `golongan`, `pangkat`, `status`) VALUES
+(1, 'I/a', 'Juru Muda', 'Aktif'),
+(2, 'I/b', 'Juru Muda Tk. I', 'Aktif'),
+(3, 'I/c', 'Juru', 'Aktif'),
+(4, 'I/d', 'Juru Tk. I', 'Aktif'),
+(5, 'II/a', 'Pengatur Muda', 'Aktif'),
+(6, 'II/b', 'Pengatur Muda Tk. I', 'Aktif'),
+(7, 'II/c', 'Pengatur', 'Aktif'),
+(8, 'II/d', 'Pengatur Tk. I', 'Aktif'),
+(9, 'III/a', 'Penata Muda', 'Aktif'),
+(10, 'III/b', 'Penata Muda Tk. I', 'Aktif'),
+(11, 'III/c', 'Penata', 'Aktif'),
+(12, 'III/d', 'Penata Tk. I', 'Aktif'),
+(13, 'IV/a', 'Pembina', 'Aktif'),
+(14, 'IV/b', 'Pembina Tk. I', 'Aktif'),
+(15, 'IV/c', 'Pembina Utama Muda', 'Aktif'),
+(16, 'IV/d', 'Pembina Utama Madya', 'Aktif'),
+(17, 'IV/e', 'Pembina Utama', 'Aktif'),
+(18, 'Gol. V', 'PPPK Golongan V', 'Aktif'),
+(19, 'Gol. VII', 'PPPK Golongan VII', 'Aktif'),
+(20, 'Gol. IX', 'PPPK Golongan IX', 'Aktif'),
+(21, 'Gol. X', 'PPPK Golongan X', 'Aktif'),
+(22, 'Gol. XI', 'PPPK Golongan XI', 'Aktif');
+
+-- --------------------------------------------------------
+-- TABEL MASTER JENJANG PENDIDIKAN
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `master_jenjang_pendidikan`;
+CREATE TABLE IF NOT EXISTS `master_jenjang_pendidikan` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `nama` VARCHAR(100) NOT NULL UNIQUE,
+  `urutan` INT DEFAULT 1,
+  `status` ENUM('Aktif', 'Tidak Aktif') NOT NULL DEFAULT 'Aktif'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `master_jenjang_pendidikan` (`id`, `nama`, `urutan`, `status`) VALUES
+(1, 'SD / Sederajat', 1, 'Aktif'),
+(2, 'SMP / MTs', 2, 'Aktif'),
+(3, 'SMA / SMK / MA', 3, 'Aktif'),
+(4, 'D-I', 4, 'Aktif'),
+(5, 'D-III (Diploma Tiga)', 5, 'Aktif'),
+(6, 'D-IV / Sarjana Terapan', 6, 'Aktif'),
+(7, 'S-1 (Sarjana)', 7, 'Aktif'),
+(8, 'Profesi (Dokter/Ners/Apt)', 8, 'Aktif'),
+(9, 'S-2 (Magister)', 9, 'Aktif'),
+(10, 'Spesialis (Sp-1 / Sp-2)', 10, 'Aktif'),
+(11, 'S-3 (Doktor)', 11, 'Aktif');
+
+-- --------------------------------------------------------
+-- TABEL MODUL PAK KONVERSI JABATAN FUNGSIONAL
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `pak_konversi`;
+CREATE TABLE IF NOT EXISTS `pak_konversi` (
+  `id` VARCHAR(50) PRIMARY KEY,
+  `nomor_pak` VARCHAR(100) NOT NULL,
+  `tgl_pak` DATE NOT NULL,
+  `nip` VARCHAR(30) NOT NULL,
+  `nama` VARCHAR(150) NOT NULL,
+  `jabatan` VARCHAR(150) DEFAULT NULL,
+  `jenjang` VARCHAR(50) DEFAULT NULL,
+  `unit_kerja` VARCHAR(150) DEFAULT 'Puskesmas Kepulauan Seribu Selatan',
+  `periode_tahun` INT NOT NULL,
+  `predikat_kinerja` ENUM('Sangat Baik', 'Baik', 'Cukup', 'Kurang', 'Sangat Kurang') NOT NULL DEFAULT 'Baik',
+  `prosentase_koefisien` DECIMAL(5,2) DEFAULT 100.00,
+  `ak_tahunan` DECIMAL(8,3) DEFAULT 0.000,
+  `ak_kumulatif_lama` DECIMAL(8,3) DEFAULT 0.000,
+  `ak_kumulatif_total` DECIMAL(8,3) DEFAULT 0.000,
+  `pejabat_nama` VARCHAR(150) DEFAULT NULL,
+  `pejabat_nip` VARCHAR(30) DEFAULT NULL,
+  `pejabat_jabatan` VARCHAR(150) DEFAULT NULL,
+  `status` ENUM('Draft', 'Final', 'Disahkan') DEFAULT 'Final',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_pak_nip` (`nip`),
+  KEY `idx_pak_tahun` (`periode_tahun`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- TABEL MODUL RENJA NON ASN & PPPK PARUH WAKTU (2027-2029)
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS `renja_pegawai`;
+CREATE TABLE IF NOT EXISTS `renja_pegawai` (
+  `id` VARCHAR(50) PRIMARY KEY,
+  `tahun_anggaran` INT NOT NULL DEFAULT 2027,
+  `kategori` ENUM('NON_ASN', 'PPPK_PW') NOT NULL,
+  `nip` VARCHAR(30) DEFAULT NULL,
+  `nik` VARCHAR(20) DEFAULT NULL,
+  `nama` VARCHAR(150) NOT NULL,
+  `jabatan` VARCHAR(150) NOT NULL,
+  `unit_tugas` VARCHAR(150) DEFAULT 'Puskesmas Kepulauan Seribu Selatan',
+  `gaji_pokok_bulanan` DECIMAL(15,2) DEFAULT 0.00,
+  `bpjs_kesehatan` DECIMAL(15,2) DEFAULT 0.00,
+  `bpjs_ketenagakerjaan` DECIMAL(15,2) DEFAULT 0.00,
+  `thr` DECIMAL(15,2) DEFAULT 0.00,
+  `gaji_ketiga_belas` DECIMAL(15,2) DEFAULT 0.00,
+  `total_anggaran_tahunan` DECIMAL(15,2) DEFAULT 0.00,
+  `status_usulan` VARCHAR(50) DEFAULT 'Disetujui',
+  `keterangan` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 -- 4. TABEL MODUL USULAN KEPEGAWAIAN

@@ -1,6 +1,6 @@
 {
   "name": "Remix SIMPEG Digital PKSS",
-  "description": "Sistem Informasi Kepegawaian (SIMPEG) Puskesmas Kepulauan Seribu Selatan - Manajemen SDMK, Diklat, Uraian Tugas, Penggajian, Dokumen, Analitik \u0026 Asisten AI",
+  "description": "Sistem Informasi Kepegawaian (SIMPEG) Puskesmas Kepulauan Seribu Selatan - Master Data Pegawai, Usulan, Disiplin Pegawai, Renja Non ASN & PPPK PW, PAK Konversi JF, Gap Kompetensi, DUK, Modul Diklat, Uraian Tugas, Dokumen, Penggajian, Analitik & Hak Akses Sistem",
   "requestFramePermissions": [
     "camera"
   ],

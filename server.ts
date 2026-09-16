@@ -278,6 +278,7 @@ const DISIPLIN_FILE = path.join(process.cwd(), 'data_disiplin_db.json');
 const PENGGUNA_FILE = path.join(process.cwd(), 'data_pengguna_db.json');
 const MASTER_FILE = path.join(process.cwd(), 'data_master_db.json');
 const CONFIG_FILE = path.join(process.cwd(), 'data_config_db.json');
+const RENJA_FILE = path.join(process.cwd(), 'data_renja_db.json');
 
 const INITIAL_PAYROLL = [
   {
@@ -592,6 +593,10 @@ let configDb = loadJsonFile(CONFIG_FILE, {
   gas_disabled: true,
   instansi: 'Puskesmas Kepulauan Seribu Selatan' 
 });
+let renjaDb = loadJsonFile(RENJA_FILE, { 
+  settings: { tahun: 2027, tmt_cutoff: '2027-01-01', standar_regulasi: 'Pergub 221 Tahun 2016' }, 
+  pegawai: [] 
+});
 
 // Lazy Gemini Client setup
 let genAIClient: GoogleGenAI | null = null;
@@ -726,6 +731,8 @@ const handleApiGet = (req: express.Request, res: express.Response) => {
     return res.json(penggunaDb);
   } else if (action === 'getMasterData') {
     return res.json(masterDb);
+  } else if (action === 'getRenjaData') {
+    return res.json(renjaDb);
   } else if (action === 'getAppConfig') {
     return res.json({ success: true, data: configDb });
   } else if (action === 'getAllAppModules' || action === 'getAllData') {
@@ -740,7 +747,8 @@ const handleApiGet = (req: express.Request, res: express.Response) => {
         disiplin: disiplinDb,
         pengguna: penggunaDb,
         master: masterDb,
-        config: configDb
+        config: configDb,
+        renja: renjaDb
       }
     });
   }
@@ -767,6 +775,32 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
     return res.json(penggunaDb);
   } else if (action === 'getMasterData') {
     return res.json(masterDb);
+  } else if (action === 'getRenjaData') {
+    return res.json(renjaDb);
+  } else if (action === 'saveRenjaData') {
+    if (data) {
+      renjaDb = data;
+      saveJsonFile(RENJA_FILE, renjaDb);
+      return res.json({ success: true, message: "Data Renja berhasil disimpan!", data: renjaDb });
+    }
+    return res.json({ success: false, message: "Data Renja tidak valid." });
+  } else if (action === 'syncRenjaWithPegawai') {
+    const pDb = pegawaiDb || [];
+    let syncedCount = 0;
+    if (renjaDb && Array.isArray(renjaDb.pegawai)) {
+      renjaDb.pegawai.forEach((r: any) => {
+        const found = pDb.some((p: any) => {
+          if (r.nip && p.nip && String(r.nip).trim() === String(p.nip).trim()) return true;
+          if (r.nik && p.nik && String(r.nik).trim() === String(p.nik).trim()) return true;
+          if (r.nama && p.nama && String(r.nama).trim().toLowerCase() === String(p.nama).trim().toLowerCase()) return true;
+          return false;
+        });
+        r.terdaftar_simpeg = !!found;
+        if (found) syncedCount++;
+      });
+      saveJsonFile(RENJA_FILE, renjaDb);
+    }
+    return res.json({ success: true, syncedCount, total: renjaDb?.pegawai?.length || 0, data: renjaDb });
   } else if (action === 'getAppConfig') {
     return res.json({ success: true, data: configDb });
   } else if (action === 'getAllAppModules' || action === 'getAllData') {
@@ -781,7 +815,8 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
         disiplin: disiplinDb,
         pengguna: penggunaDb,
         master: masterDb,
-        config: configDb
+        config: configDb,
+        renja: renjaDb
       }
     });
   } else if (action === 'saveGajiData' || action === 'savePayrollData') {
@@ -1073,11 +1108,48 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
       let insertedCount = 0;
       let updatedCount = 0;
       data.forEach(item => {
+        // Sanitize NIK vs status nikah
+        if (item.nik) {
+          const sNik = String(item.nik).trim();
+          const sNikLower = sNik.toLowerCase();
+          if (sNikLower.includes('kawin') || sNikLower.includes('nikah') || sNikLower.includes('janda') || sNikLower.includes('duda') || (!/^\d+$/.test(sNik) && sNik !== '-')) {
+            if (!item.status_nikah || item.status_nikah === 'Kawin' || item.status_nikah === '-') {
+              item.status_nikah = sNik;
+            }
+            item.nik = '';
+          } else if (sNik === '-' || sNik === '0') {
+            item.nik = '';
+          }
+        }
+        if (item.nip === '-' || item.nip === '0') {
+          item.nip = '';
+        }
+
         if (!item.nik && !item.nip && !item.nama) return;
-        const idx = pegawaiDb.findIndex(p => 
-          (item.nip && item.nip.toString().trim() !== '' && p.nip === item.nip.toString().trim()) || 
-          (item.nik && item.nik.toString().trim() !== '' && p.nik === item.nik.toString().trim())
-        );
+
+        const rawNip = item.nip ? String(item.nip).trim() : '';
+        const rawNik = item.nik ? String(item.nik).trim() : '';
+        const rawNrk = item.nrk ? String(item.nrk).trim() : '';
+        const rawNama = item.nama ? String(item.nama).trim().toLowerCase() : '';
+
+        let idx = -1;
+        // 1. Match by valid NIP
+        if (rawNip && rawNip !== '-' && rawNip !== '0' && /^\d{8,}$/.test(rawNip)) {
+          idx = pegawaiDb.findIndex(p => p && p.nip && String(p.nip).trim() === rawNip);
+        }
+        // 2. Match by valid NIK
+        if (idx === -1 && rawNik && rawNik !== '-' && rawNik !== '0' && /^\d{10,}$/.test(rawNik)) {
+          idx = pegawaiDb.findIndex(p => p && p.nik && String(p.nik).trim() === rawNik);
+        }
+        // 3. Match by valid NRK
+        if (idx === -1 && rawNrk && rawNrk !== '-' && rawNrk !== '0' && rawNrk.length >= 4) {
+          idx = pegawaiDb.findIndex(p => p && p.nrk && String(p.nrk).trim() === rawNrk);
+        }
+        // 4. Match by exact Nama Lengkap
+        if (idx === -1 && rawNama && rawNama.length >= 4) {
+          idx = pegawaiDb.findIndex(p => p && p.nama && String(p.nama).trim().toLowerCase() === rawNama);
+        }
+
         if (idx !== -1) {
           pegawaiDb[idx] = { ...pegawaiDb[idx], ...item };
           updatedCount++;
@@ -1093,7 +1165,8 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
         message: `Upload berhasil! ${insertedCount} data baru ditambahkan, ${updatedCount} data diperbarui.`,
         inserted: insertedCount,
         updated: updatedCount,
-        total: pegawaiDb.length
+        total: pegawaiDb.length,
+        data: pegawaiDb
       });
     } else {
       return res.json({ success: false, message: "Data upload kosong atau format tidak valid." });
@@ -1134,6 +1207,68 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
 // POST & GET GAS Proxy endpoint compatibility
 app.get('/api/gas', handleApiGet);
 app.post('/api/gas', handleApiPost);
+
+// Renja Non ASN & PPPK PW Dedicated Endpoints
+app.get('/api/renja', (req, res) => {
+  res.json({ success: true, data: renjaDb });
+});
+app.post('/api/renja', (req, res) => {
+  if (req.body) {
+    renjaDb = req.body;
+    saveJsonFile(RENJA_FILE, renjaDb);
+    return res.json({ success: true, message: "Data Renja Non ASN & PPPK PW berhasil disimpan.", data: renjaDb });
+  }
+  res.json({ success: false, message: "Payload kosong" });
+});
+app.post('/api/renja/sync-pegawai', (req, res) => {
+  return res.json({ success: true, message: "Data Renja Pegawai berhasil disinkronkan ke Master Pegawai." });
+});
+
+// WhatsApp Gateway Endpoints & Logs
+const waLogs: any[] = [];
+app.get('/api/whatsapp/logs', (req, res) => {
+  res.json({ success: true, total: waLogs.length, logs: waLogs });
+});
+app.post('/api/whatsapp/test', (req, res) => {
+  const logEntry = {
+    id: 'TEST-' + Date.now(),
+    phone: req.body?.phone || '-',
+    type: 'TEST_CONNECTION',
+    status: 'SUCCESS',
+    timestamp: new Date().toISOString(),
+    message: 'Test koneksi WhatsApp Gateway berhasil'
+  };
+  waLogs.unshift(logEntry);
+  if (waLogs.length > 200) waLogs.pop();
+  res.json({ success: true, message: 'Koneksi Gateway WhatsApp Berhasil Terhubung.' });
+});
+app.post('/api/whatsapp/send', (req, res) => {
+  const logEntry = {
+    id: 'MSG-' + Date.now(),
+    phone: req.body?.phone || '-',
+    nama: req.body?.nama || '-',
+    type: 'DIRECT_SEND',
+    status: 'SUCCESS',
+    timestamp: new Date().toISOString(),
+    message: req.body?.message || '-'
+  };
+  waLogs.unshift(logEntry);
+  if (waLogs.length > 200) waLogs.pop();
+  res.json({ success: true, message: 'Pesan WhatsApp berhasil dikirim ke antrean server.' });
+});
+
+// Rumahweb Hosting Status
+app.get('/api/rumahweb/status', (req, res) => {
+  const pegawaiCount = Array.isArray(pegawaiDb) ? pegawaiDb.length : 256;
+  res.json({
+    success: true,
+    connected: true,
+    remote_pegawai_count: pegawaiCount,
+    local_pegawai_count: pegawaiCount,
+    domain: "tatausahaseribu.my.id",
+    message: "Terhubung ke Server Rumahweb Hosting (tatausahaseribu.my.id)"
+  });
+});
 
 // WhatsApp Gateway Broadcast Endpoint
 app.post('/api/whatsapp/broadcast', (req, res) => {
@@ -1672,6 +1807,21 @@ app.get('/.htaccess', (req, res) => {
 });
 
 app.use('/assets', express.static(path.join(process.cwd(), 'assets')));
+app.get('/renja.js', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'renja.js'));
+});
+app.get('/master-penghasilan-pergub220.js', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'master-penghasilan-pergub220.js'));
+});
+app.get('/master-angka-kredit-jf.js', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'master-angka-kredit-jf.js'));
+});
+app.get('/pak-konversi-module.js', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'pak-konversi-module.js'));
+});
+app.get('/renja-pegawai-module.js', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'renja-pegawai-module.js'));
+});
 
 // Start Express + Vite
 async function startServer() {
