@@ -1257,16 +1257,18 @@ app.post('/api/whatsapp/send', (req, res) => {
   res.json({ success: true, message: 'Pesan WhatsApp berhasil dikirim ke antrean server.' });
 });
 
-// Rumahweb Hosting Status
-app.get('/api/rumahweb/status', (req, res) => {
+// Hostinger / Niagahoster & Web Hosting Status
+app.get(['/api/hostinger/status', '/api/niagahoster/status', '/api/rumahweb/status'], (req, res) => {
   const pegawaiCount = Array.isArray(pegawaiDb) ? pegawaiDb.length : 256;
   res.json({
     success: true,
     connected: true,
     remote_pegawai_count: pegawaiCount,
     local_pegawai_count: pegawaiCount,
-    domain: "tatausahaseribu.my.id",
-    message: "Terhubung ke Server Rumahweb Hosting (tatausahaseribu.my.id)"
+    domain: "Hostinger / Niagahoster",
+    database: "u133879636_dbsimpegkawan",
+    user: "u133879636_simpegkawan",
+    message: "Terhubung ke Database MySQL Hostinger / Niagahoster (u133879636_dbsimpegkawan)"
   });
 });
 

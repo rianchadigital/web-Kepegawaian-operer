@@ -22,18 +22,18 @@
 
     <!-- BACKEND & DATABASE INTEGRATION -->
     <script>
-        window.rumahwebConfig = {
-            domain: "tatausahaseribu.my.id",
-            database: "tatf8647_database_simpeg",
-            user: "tatf8647_zain",
+        window.hostingerConfig = window.rumahwebConfig = {
+            provider: "Hostinger / Niagahoster",
+            database: "u133879636_dbsimpegkawan",
+            user: "u133879636_simpegkawan",
             apiEndpoint: (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname.includes(".run.app"))
                 ? "/api.php"
-                : "https://tatausahaseribu.my.id/api.php"
+                : "api.php"
         };
 
         // Module-level sync function to Server MySQL & Storage
-        window.saveModuleDataToRumahweb = async function(moduleName, payloadData) {
-            const targetUrl = window.rumahwebConfig.apiEndpoint;
+        window.saveModuleDataToHostinger = window.saveModuleDataToRumahweb = async function(moduleName, payloadData) {
+            const targetUrl = window.hostingerConfig.apiEndpoint;
             try {
                 const response = await fetch(targetUrl, {
                     method: 'POST',
@@ -54,16 +54,16 @@
         // Compatibility bridge for module sync
         window.firestoreSync = {
             savePegawai: function(pData) {
-                return window.saveModuleDataToRumahweb('pegawai', pData);
+                return window.saveModuleDataToHostinger('pegawai', pData);
             },
             saveUsulan: function(uData) {
-                return window.saveModuleDataToRumahweb('usulan', uData);
+                return window.saveModuleDataToHostinger('usulan', uData);
             }
         };
 
         // Password reset handler
         window.sendFirebasePasswordResetEmail = async function(email) {
-            const targetUrl = window.rumahwebConfig.apiEndpoint;
+            const targetUrl = (window.hostingerConfig || window.rumahwebConfig).apiEndpoint;
             const res = await fetch(targetUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -630,7 +630,7 @@
 <div id="app-wrapper-override">
 
     <!-- Loading Overlay -->
-    <div id="loadingOverlay">
+    <div id="loadingOverlay" style="display: none !important;">
         <div class="spinner-border" style="width: 3.5rem; height: 3.5rem; color: var(--accent-color);" role="status"></div>
         <h5 class="mt-4 fw-bold" style="color: var(--accent-color);" id="loadingText">Memproses Data...</h5>
     </div>
@@ -836,11 +836,11 @@
                 <div class="container-fluid">
                     <span class="navbar-brand mb-0 h5 fw-bold text-dark" id="page-title">Dashboard</span>
                     <div class="d-flex align-items-center gap-2">
-                        <div id="badge-rumahweb-sync-status" class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 d-none d-md-inline-flex align-items-center gap-2 cursor-pointer shadow-xs" onclick="window.syncAllToRumahweb(true)" title="Sinkronisasi Otomatis ke Server Hosting Rumahweb (tatausahaseribu.my.id) Aktif. Klik untuk sinkronkan sekarang">
+                        <div id="badge-rumahweb-sync-status" class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 d-none d-md-inline-flex align-items-center gap-2 cursor-pointer shadow-xs" onclick="window.syncAllToHostinger(true)" title="Sinkronisasi Otomatis ke Database Hostinger / Niagahoster (u133879636_dbsimpegkawan). Klik untuk sinkronkan sekarang">
                             <i class="fas fa-cloud-check text-success" id="icon-rumahweb-sync"></i>
-                            <span id="text-rumahweb-sync" class="fw-bold" style="font-size:0.75rem;">Rumahweb Tersinkron</span>
+                            <span id="text-rumahweb-sync" class="fw-bold" style="font-size:0.75rem;">Hostinger Tersinkron</span>
                         </div>
-                        <button class="btn bg-light text-primary btn-sm me-1 rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS()"><i class="fas fa-sync-alt me-1"></i> Segarkan Data</button>
+                        <button class="btn bg-light text-primary btn-sm me-1 rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS(true)"><i class="fas fa-sync-alt me-1"></i> Segarkan Data</button>
                         <span class="ms-2 me-1 fw-bold text-secondary" id="user-display-name"><i class="fas fa-user-circle fs-5 me-2 align-middle text-primary"></i> Memuat...</span>
                         <button class="btn btn-sm btn-outline-primary rounded-pill fw-bold px-3" onclick="$('#modalUbahPassword').modal('show')"><i class="fas fa-key me-1"></i> Ubah Sandi</button>
                     </div>
@@ -4734,32 +4734,32 @@
                                                 <div class="form-check form-switch p-3 bg-white rounded-3 border">
                                                     <input class="form-check-input ms-0 me-2" type="checkbox" id="set_auto_sync" checked>
                                                     <label class="form-check-label fw-semibold text-dark" for="set_auto_sync">
-                                                        Sinkronisasi Otomatis Server Rumahweb
+                                                        Sinkronisasi Otomatis Database Hostinger / Niagahoster
                                                     </label>
-                                                    <small class="text-muted d-block">Otomatis sinkronkan ke server Rumahweb (tatausahaseribu.my.id) setiap kali data pegawai diperbarui secara lokal.</small>
+                                                    <small class="text-muted d-block">Otomatis sinkronkan ke database MySQL Hostinger / Niagahoster (<code>u133879636_dbsimpegkawan</code>) setiap kali data pegawai diperbarui secara lokal.</small>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <!-- Live Rumahweb Server Status Banner -->
+                                        <!-- Live Hostinger / Niagahoster Database Status Banner -->
                                         <div class="p-3 bg-white rounded-3 border mt-3 d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-2xs">
                                             <div class="d-flex align-items-center gap-3">
                                                 <div class="p-2 rounded-circle bg-success-subtle text-success border border-success-subtle">
-                                                    <i class="fas fa-server fs-5"></i>
+                                                    <i class="fas fa-database fs-5"></i>
                                                 </div>
                                                 <div>
                                                     <div class="fw-bold text-dark d-flex align-items-center gap-2">
-                                                        <span>Server Rumahweb Hosting (tatausahaseribu.my.id)</span>
-                                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle extra-small">cPanel MySQL & JSON</span>
+                                                        <span>Database MySQL Hostinger / Niagahoster</span>
+                                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle extra-small">u133879636_dbsimpegkawan</span>
                                                     </div>
-                                                    <small class="text-muted" id="status-rumahweb-settings-text">Status: <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Tersinkron Otomatis</span> • Terakhir: <span id="set_last_sync_time" class="fw-semibold">Baru Saja</span></small>
+                                                    <small class="text-muted" id="status-rumahweb-settings-text">Status: <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Tersinkron Otomatis (Hostinger)</span> • Terakhir: <span id="set_last_sync_time" class="fw-semibold">Baru Saja</span></small>
                                                 </div>
                                             </div>
                                             <div class="d-flex gap-2">
-                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold" onclick="window.testRumahwebConnection()">
+                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold" onclick="window.testHostingerConnection()">
                                                     <i class="fas fa-plug me-1"></i> Uji Koneksi
                                                 </button>
-                                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm" onclick="window.syncAllToRumahweb(true)">
+                                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm" onclick="window.syncAllToHostinger(true)">
                                                     <i class="fas fa-sync-alt me-1"></i> Sinkronkan Sekarang
                                                 </button>
                                             </div>
@@ -5001,7 +5001,7 @@
                                         <input type="file" id="inputImportJson" accept=".json" style="display:none;" onchange="window.importDatabaseJson(event)">
                                     </div>
                                     <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-secondary w-full btn-sm rounded-pill py-2 px-3 fw-bold w-100" onclick="window.syncAllToRumahweb(true)">
+                                        <button type="button" class="btn btn-outline-secondary w-full btn-sm rounded-pill py-2 px-3 fw-bold w-100" onclick="window.syncAllToHostinger(true)" title="Paksa sinkronisasi ke Database Hostinger / Niagahoster">
                                             <i class="fas fa-cloud-upload-alt me-1"></i> Paksa Sync Ke Server
                                         </button>
                                     </div>
@@ -5097,7 +5097,7 @@
                             </div>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm fw-semibold" onclick="window.syncHakAksesToRumahwebDb()" title="Simpan & Sinkronkan langsung ke tabel `users` Database MySQL Rumahweb">
+                            <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm fw-semibold" onclick="window.syncHakAksesToHostingerDb()" title="Simpan & Sinkronkan langsung ke tabel `users` Database MySQL Hostinger / Niagahoster">
                                 <i class="fas fa-database me-1"></i> Sinkron Database MySQL
                             </button>
                             <button type="button" class="btn btn-outline-info btn-sm rounded-pill px-3 shadow-sm fw-semibold" onclick="window.showDatabaseStatusModal()" title="Cek status koneksi MySQL & konfigurasi config.php">
@@ -6154,7 +6154,7 @@
             </div>
         </div>
 
-        <!-- MODAL DEPLOYMENT DEWAWEB / WEB HOSTING -->
+        <!-- MODAL DEPLOYMENT / WEB HOSTING -->
         <div class="modal fade" id="modalDeploymentRumahweb" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -6162,8 +6162,8 @@
                         <div class="d-flex align-items-center gap-2">
                             <i class="fas fa-cloud-download-alt fs-3"></i>
                             <div>
-                                <h5 class="modal-title fw-bold mb-0">Link Download Bundle Deployment Hosting Dewaweb</h5>
-                                <p class="small text-white-50 mb-0">Paket Siap Pakai Versi Terbaru untuk Web Hosting cPanel Dewaweb / DirectAdmin</p>
+                                <h5 class="modal-title fw-bold mb-0">Link Download Bundle Deployment Hosting</h5>
+                                <p class="small text-white-50 mb-0">Paket Siap Pakai Versi Terbaru untuk Web Hosting / GitHub</p>
                             </div>
                         </div>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -6173,8 +6173,8 @@
                             <div class="d-flex gap-3 align-items-center">
                                 <i class="fas fa-check-circle text-success fs-2"></i>
                                 <div>
-                                    <h6 class="fw-bold text-success mb-1">Single Source of Truth: Hosting Dewaweb</h6>
-                                    <p class="small text-secondary mb-0">Seluruh data pegawai, usulan, disiplin, gap kompetensi, dan diklat bersumber langsung dari Server Dewaweb melalui <code>api.php</code> & database MySQL/JSON, menjamin data selalu sinkron dan konsisten di seluruh perangkat.</p>
+                                    <h6 class="fw-bold text-success mb-1">Single Source of Truth: Server Hosting</h6>
+                                    <p class="small text-secondary mb-0">Seluruh data pegawai, usulan, disiplin, gap kompetensi, dan diklat terpusat melalui <code>api.php</code> & database MySQL/JSON, menjamin data selalu sinkron dan konsisten di seluruh perangkat.</p>
                                 </div>
                             </div>
                         </div>
@@ -11144,12 +11144,12 @@
         };
 
         // =========================================================================
-        // AUTOMATIC SYNCHRONIZATION ENGINE TO SERVER RUMAHWEB (tatausahaseribu.my.id)
+        // AUTOMATIC SYNCHRONIZATION ENGINE TO DATABASE HOSTINGER / NIAGAHOSTER
         // =========================================================================
-        window.rumahwebSyncEngine = {
+        window.hostingerSyncEngine = window.rumahwebSyncEngine = {
             isSyncing: false,
             debounceTimer: null,
-            targetHost: 'https://tatausahaseribu.my.id/api.php',
+            targetHost: 'api.php',
 
             isAutoSyncEnabled: function() {
                 return localStorage.getItem('simpeg_auto_sync') !== 'false';
@@ -11163,13 +11163,13 @@
                 const lastTimeBadge = $('#set_last_sync_time');
                 const timeEl = $('#stat-stored-time');
 
-                let timeStr = customTime || localStorage.getItem('simpeg_last_rumahweb_sync') || (new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB");
+                let timeStr = customTime || localStorage.getItem('simpeg_last_hostinger_sync') || localStorage.getItem('simpeg_last_rumahweb_sync') || (new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB");
 
                 if (state === 'syncing') {
                     badge.removeClass('bg-success-subtle text-success border-success-subtle bg-danger-subtle text-danger border-danger-subtle bg-warning-subtle text-warning border-warning-subtle')
                          .addClass('bg-primary-subtle text-primary border-primary-subtle');
                     icon.removeClass('fa-cloud-check fa-exclamation-triangle fa-cloud-slash').addClass('fa-sync-alt fa-spin');
-                    text.text('Menyinkronkan ke Rumahweb...');
+                    text.text('Menyinkronkan ke Hostinger...');
                     if (settingsText.length) {
                         settingsText.html(`Status: <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1"><i class="fas fa-sync-alt fa-spin me-1"></i>Menyinkronkan...</span> • Terakhir: <span class="fw-semibold">${timeStr}</span>`);
                     }
@@ -11177,9 +11177,9 @@
                     badge.removeClass('bg-primary-subtle text-primary border-primary-subtle bg-danger-subtle text-danger border-danger-subtle bg-warning-subtle text-warning border-warning-subtle')
                          .addClass('bg-success-subtle text-success border-success-subtle');
                     icon.removeClass('fa-sync-alt fa-spin fa-exclamation-triangle fa-cloud-slash').addClass('fa-cloud-check');
-                    text.text(`Rumahweb Tersinkron (${timeStr})`);
+                    text.text(`Hostinger Tersinkron (${timeStr})`);
                     if (settingsText.length) {
-                        settingsText.html(`Status: <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Tersinkron Otomatis</span> • Terakhir: <span class="fw-semibold">${timeStr}</span>`);
+                        settingsText.html(`Status: <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Tersinkron Otomatis (Hostinger)</span> • Terakhir: <span class="fw-semibold">${timeStr}</span>`);
                     }
                     if (lastTimeBadge.length) lastTimeBadge.text(timeStr);
                     if (timeEl.length) timeEl.text(timeStr);
@@ -11187,7 +11187,7 @@
                     badge.removeClass('bg-primary-subtle text-primary border-primary-subtle bg-success-subtle text-success border-success-subtle bg-danger-subtle text-danger border-danger-subtle')
                          .addClass('bg-warning-subtle text-warning border-warning-subtle');
                     icon.removeClass('fa-sync-alt fa-spin fa-cloud-check fa-exclamation-triangle').addClass('fa-cloud-slash');
-                    text.text('Antrean Offline (Tersimpan Aman)');
+                    text.text('Antrean Offline (Tersimpan Lokal)');
                     if (settingsText.length) {
                         settingsText.html(`Status: <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1"><i class="fas fa-clock me-1"></i>Antrean Offline</span> • Terakhir: <span class="fw-semibold">${timeStr}</span>`);
                     }
@@ -11195,7 +11195,7 @@
                     badge.removeClass('bg-primary-subtle text-primary border-primary-subtle bg-success-subtle text-success border-success-subtle bg-warning-subtle text-warning border-warning-subtle')
                          .addClass('bg-danger-subtle text-danger border-danger-subtle');
                     icon.removeClass('fa-sync-alt fa-spin fa-cloud-check').addClass('fa-exclamation-triangle');
-                    text.text('Gagal Sinkron Rumahweb');
+                    text.text('Gagal Sinkron Hostinger');
                     if (settingsText.length) {
                         settingsText.html(`Status: <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="fas fa-exclamation-triangle me-1"></i>Koneksi Tertunda</span> • Terakhir: <span class="fw-semibold">${timeStr}</span>`);
                     }
@@ -11225,7 +11225,7 @@
                     const payload = { action: 'saveAllData', data: pegList };
                     const localEndpoint = window.getApiEndpoint('saveAllData');
 
-                    // 1. Post to current app backend (saves locally and relays to Rumahweb)
+                    // 1. Post to current app backend (saves locally and relays to Hostinger)
                     fetch(localEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -11234,16 +11234,18 @@
                     .then(r => r.json())
                     .then(res => {
                         const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + " WIB";
+                        localStorage.setItem('simpeg_last_hostinger_sync', nowStr);
                         localStorage.setItem('simpeg_last_rumahweb_sync', nowStr);
+                        localStorage.removeItem('simpeg_pending_hostinger_sync');
                         localStorage.removeItem('simpeg_pending_rumahweb_sync');
                         self.updateStatusUi('synced', nowStr);
                         if (showToastOnSuccess) {
-                            showToast(`Data pegawai (${pegList.length} orang) berhasil disinkronkan ke server Rumahweb!`, "success");
+                            showToast(`Data pegawai (${pegList.length} orang) berhasil disinkronkan ke Database Hostinger / Niagahoster!`, "success");
                         }
                     })
                     .catch(err => {
-                        console.warn("[Rumahweb Sync] Local endpoint warning, attempting direct endpoint:", err);
-                        // Fallback attempt direct to Rumahweb
+                        console.warn("[Hostinger Sync] Local endpoint warning, attempting direct endpoint:", err);
+                        // Fallback attempt direct to Hostinger api.php
                         fetch(self.targetHost + '?action=saveAllData', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -11252,16 +11254,18 @@
                         .then(r => r.json())
                         .then(res => {
                             const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + " WIB";
+                            localStorage.setItem('simpeg_last_hostinger_sync', nowStr);
                             localStorage.setItem('simpeg_last_rumahweb_sync', nowStr);
+                            localStorage.removeItem('simpeg_pending_hostinger_sync');
                             localStorage.removeItem('simpeg_pending_rumahweb_sync');
                             self.updateStatusUi('synced', nowStr);
                             if (showToastOnSuccess) {
-                                showToast(`Data pegawai (${pegList.length} orang) berhasil disinkronkan ke server Rumahweb!`, "success");
+                                showToast(`Data pegawai (${pegList.length} orang) berhasil disinkronkan ke Database Hostinger / Niagahoster!`, "success");
                             }
                         })
                         .catch(fallbackErr => {
-                            console.error("[Rumahweb Sync Error]", fallbackErr);
-                            localStorage.setItem('simpeg_pending_rumahweb_sync', 'true');
+                            console.error("[Hostinger Sync Error]", fallbackErr);
+                            localStorage.setItem('simpeg_pending_hostinger_sync', 'true');
                             self.updateStatusUi('offline');
                         });
                     });
@@ -11275,33 +11279,33 @@
             }
         };
 
-        window.triggerAutoSyncRumahweb = function(immediate = false, showToastOnSuccess = false) {
-            window.rumahwebSyncEngine.triggerAutoSync(immediate, showToastOnSuccess);
+        window.triggerAutoSyncHostinger = window.triggerAutoSyncRumahweb = function(immediate = false, showToastOnSuccess = false) {
+            window.hostingerSyncEngine.triggerAutoSync(immediate, showToastOnSuccess);
         };
 
-        window.syncPegawaiToRumahweb = function(showNotice = true) {
-            window.rumahwebSyncEngine.triggerAutoSync(true, showNotice);
+        window.syncPegawaiToHostinger = window.syncPegawaiToRumahweb = function(showNotice = true) {
+            window.hostingerSyncEngine.triggerAutoSync(true, showNotice);
         };
 
-        window.testRumahwebConnection = function() {
-            showToast("Menguji koneksi ke Server Rumahweb (tatausahaseribu.my.id)...", "info");
-            fetch('/api/rumahweb/status')
+        window.testHostingerConnection = window.testRumahwebConnection = function() {
+            showToast("Menguji koneksi ke Database Hostinger / Niagahoster (u133879636_dbsimpegkawan)...", "info");
+            fetch('/api/hostinger/status')
                 .then(r => r.json())
                 .then(res => {
                     if (res && res.connected) {
-                        showToast(`Server Rumahweb Terhubung! Total Pegawai di Server: ${res.remote_pegawai_count || res.local_pegawai_count}.`, "success");
-                        window.rumahwebSyncEngine.updateStatusUi('synced');
+                        showToast(`Database Hostinger / Niagahoster Terhubung! Total Pegawai: ${res.remote_pegawai_count || res.local_pegawai_count}.`, "success");
+                        window.hostingerSyncEngine.updateStatusUi('synced');
                     } else {
                         // Direct ping fallback
-                        fetch('https://tatausahaseribu.my.id/api.php?action=getAllAppModules')
+                        fetch('api.php?action=getAllAppModules')
                             .then(r => r.json())
                             .then(data => {
-                                showToast("Server Rumahweb berhasil dijangkau langsung!", "success");
-                                window.rumahwebSyncEngine.updateStatusUi('synced');
+                                showToast("Database Hostinger / Niagahoster berhasil dijangkau!", "success");
+                                window.hostingerSyncEngine.updateStatusUi('synced');
                             })
                             .catch(e => {
-                                showToast("Koneksi ke Server Rumahweb: " + (res.message || e.message), "warning");
-                                window.rumahwebSyncEngine.updateStatusUi('offline');
+                                showToast("Koneksi ke Database Hostinger: " + (res.message || e.message), "warning");
+                                window.hostingerSyncEngine.updateStatusUi('offline');
                             });
                     }
                 })
@@ -11312,14 +11316,14 @@
 
         // Otomatis sinkronkan kembali antrean ketika koneksi internet pulih
         window.addEventListener('online', function() {
-            if (localStorage.getItem('simpeg_pending_rumahweb_sync') === 'true') {
-                console.log("[Rumahweb Sync] Koneksi kembali online, menyinkronkan data pegawai ke Rumahweb...");
-                window.triggerAutoSyncRumahweb(true, true);
+            if (localStorage.getItem('simpeg_pending_hostinger_sync') === 'true' || localStorage.getItem('simpeg_pending_rumahweb_sync') === 'true') {
+                console.log("[Hostinger Sync] Koneksi kembali online, menyinkronkan data pegawai ke Database Hostinger...");
+                window.triggerAutoSyncHostinger(true, true);
             }
         });
 
-        window.saveModuleDataToDewaweb = window.saveModuleDataToHosting = window.saveModuleDataToRumahweb = function(action, payload, successMsg) {
-            window.rumahwebSyncEngine.updateStatusUi('syncing');
+        window.saveModuleDataToHostinger = window.saveModuleDataToDewaweb = window.saveModuleDataToHosting = window.saveModuleDataToRumahweb = function(action, payload, successMsg) {
+            window.hostingerSyncEngine.updateStatusUi('syncing');
             let endpoint = window.getApiEndpoint(action);
             fetch(endpoint, {
                 method: 'POST',
@@ -11329,8 +11333,9 @@
             .then(r => r.json())
             .then(res => {
                 const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB";
+                localStorage.setItem('simpeg_last_hostinger_sync', nowStr);
                 localStorage.setItem('simpeg_last_rumahweb_sync', nowStr);
-                window.rumahwebSyncEngine.updateStatusUi('synced', nowStr);
+                window.hostingerSyncEngine.updateStatusUi('synced', nowStr);
                 if (res.success && successMsg) {
                     showToast(successMsg, "success");
                 }
@@ -11342,17 +11347,18 @@
                     body: JSON.stringify({ action: action, data: payload })
                 }).then(r => r.json()).then(res => {
                     const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB";
+                    localStorage.setItem('simpeg_last_hostinger_sync', nowStr);
                     localStorage.setItem('simpeg_last_rumahweb_sync', nowStr);
-                    window.rumahwebSyncEngine.updateStatusUi('synced', nowStr);
+                    window.hostingerSyncEngine.updateStatusUi('synced', nowStr);
                     if (res.success && successMsg) showToast(successMsg, "success");
                 }).catch(e => {
-                    console.warn("Sync Hosting Rumahweb offline/fallback:", e);
-                    window.rumahwebSyncEngine.updateStatusUi('offline');
+                    console.warn("Sync Database Hostinger offline/fallback:", e);
+                    window.hostingerSyncEngine.updateStatusUi('offline');
                 });
             });
         };
 
-        window.syncAllToDewaweb = window.syncAllToHosting = window.syncAllToRumahweb = function(showNotice = true) {
+        window.syncAllToHostinger = window.syncAllToDewaweb = window.syncAllToHosting = window.syncAllToRumahweb = function(showNotice = true) {
             let pengguna = window.penggunaList || [];
             if (!pengguna.length) {
                 try { pengguna = JSON.parse(localStorage.getItem('simpeg_admin_pengguna') || '[]'); } catch(e){}
@@ -11377,11 +11383,14 @@
                     unit: window.masterUnitTugasList || []
                 }
             };
-            window.saveModuleDataToRumahweb('saveAllAppModules', bundle, showNotice ? "Seluruh data modul berhasil disinkronkan ke server Hosting Rumahweb!" : null);
+            window.saveModuleDataToHostinger('saveAllAppModules', bundle, showNotice ? "Seluruh data modul berhasil disinkronkan ke Database Hostinger / Niagahoster!" : null);
         };
 
-        function loadDataFromGAS() {
-            $('#loadingText').text("Memuat Data dari Server Hosting Dewaweb..."); $('#loadingOverlay').css('display', 'flex');
+        function loadDataFromGAS(showFeedback = false) {
+            $('#loadingOverlay').hide();
+            if (showFeedback && typeof showToast === 'function') {
+                showToast("Menyinkronkan data terbaru dari server...", "info");
+            }
 
             const applyServerData = (serverBundle) => {
                 if (!serverBundle || typeof serverBundle !== 'object') {
@@ -16553,7 +16562,7 @@
                 let url = URL.createObjectURL(blob);
                 let dateStr = new Date().toISOString().slice(0, 10);
                 link.setAttribute("href", url);
-                link.setAttribute("download", `SIMPEG_Database_Backup_Dewaweb_${dateStr}.json`);
+                link.setAttribute("download", `SIMPEG_Database_Backup_${dateStr}.json`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -26661,7 +26670,7 @@
             }
         };
 
-        window.syncHakAksesToRumahwebDb = function() {
+        window.syncHakAksesToHostingerDb = window.syncHakAksesToRumahwebDb = function() {
             let penggunaList = [];
             try {
                 penggunaList = JSON.parse(localStorage.getItem('simpeg_admin_pengguna') || '[]');
@@ -26674,7 +26683,7 @@
                 } catch(e) { penggunaList = []; }
             }
 
-            showToast("Menghubungkan ke Database MySQL Hosting Rumahweb...", "info");
+            showToast("Menghubungkan ke Database MySQL Hostinger / Niagahoster...", "info");
 
             fetch('api.php?action=syncUsersToMysql', {
                 method: 'POST',
@@ -26684,16 +26693,16 @@
             .then(res => res.json())
             .then(res => {
                 if (res.success && !res.fallback) {
-                    showToast(res.message || "Data Hak Akses & Matriks Izin Pengguna berhasil tersimpan di tabel `users` MySQL Rumahweb!", "success");
+                    showToast(res.message || "Data Hak Akses & Matriks Izin Pengguna berhasil tersimpan di tabel `users` MySQL Hostinger / Niagahoster!", "success");
                 } else if (res.fallback) {
                     showToast(res.message || "Data Hak Akses tersimpan di file internal server.", "info");
                 } else {
-                    window.saveModuleDataToRumahweb('savePenggunaData', penggunaList);
+                    window.saveModuleDataToHostinger('savePenggunaData', penggunaList);
                     showToast(res.message || "Data Hak Akses berhasil disimpan ke server.", "success");
                 }
             })
             .catch(err => {
-                window.saveModuleDataToRumahweb('savePenggunaData', penggunaList);
+                window.saveModuleDataToHostinger('savePenggunaData', penggunaList);
                 showToast("Data Hak Akses tersimpan ke file storage server.", "info");
             });
         };
@@ -26769,7 +26778,7 @@
 
                 if (diagBox) {
                     diagBox.style.display = 'block';
-                    let diagHtml = `<div><strong>Host:</strong> ${res.db_host || 'localhost'} | <strong>Database:</strong> ${res.db_name || 'tatf8647_database_simpeg'} | <strong>User:</strong> ${res.db_user || 'tatf8647_zain'}</div>`;
+                    let diagHtml = `<div><strong>Host:</strong> ${res.db_host || 'localhost'} | <strong>Database:</strong> ${res.db_name || 'u133879636_dbsimpegkawan'} | <strong>User:</strong> ${res.db_user || 'u133879636_simpegkawan'}</div>`;
                     if (res.pdo_error) {
                         diagHtml += `<div class="mt-1 text-danger"><strong>Error MySQL:</strong> ${res.pdo_error}</div>`;
                     }
