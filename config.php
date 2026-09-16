@@ -36,6 +36,9 @@ function getHostingerConnection() {
             PDO::ATTR_EMULATE_PREPARES => false,
             PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES {$dbCharset}"
         ]);
+        try {
+            $pdo->exec("SET sql_mode = 'NO_ENGINE_SUBSTITUTION'");
+        } catch (Exception $e) {}
         return $pdo;
     } catch (PDOException $e) {
         error_log("Hostinger MySQL Connection Error: " . $e->getMessage());

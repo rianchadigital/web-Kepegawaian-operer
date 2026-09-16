@@ -47,6 +47,9 @@ if (!$pdo) {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO_FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
+            try {
+                $pdo->exec("SET sql_mode = 'NO_ENGINE_SUBSTITUTION'");
+            } catch (Exception $e) {}
         }
     } catch (Exception $e) {
         $pdo = null;
@@ -92,22 +95,68 @@ function saveAppStorage($filepath, $data) {
     return file_put_contents($filepath, $json, LOCK_EX) !== false;
 }
 
-// Helper: Clean and format dates for MySQL DATE column
+// Global tracker for last MySQL error to ensure transparent debugging
+$GLOBALS['lastMySqlError'] = null;
+
+// Helper: Clean and format dates strictly for MySQL DATE column (strict mode safe)
 function cleanDateForSql($val) {
-    if (empty($val) || $val === '-' || $val === '0' || $val === '0000-00-00') return null;
-    $val = trim($val);
-    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $val)) return $val;
-    if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $val, $m)) {
-        return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
-    }
-    $ts = strtotime($val);
-    if ($ts && $ts > 0 && $ts < 2147483647) {
-        return date('Y-m-d', $ts);
+    if ($val === null) return null;
+    if (is_string($val)) {
+        $val = trim($val);
+        if ($val === '' || $val === '-' || $val === '0' || $val === '0000-00-00' || strtolower($val) === 'null') return null;
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $val)) return $val;
+        if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $val, $m)) {
+            return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        }
+        $ts = strtotime($val);
+        if ($ts && $ts > 0 && $ts < 2147483647) {
+            return date('Y-m-d', $ts);
+        }
     }
     return null;
 }
 
-// Helper: Ensure MySQL table 'pegawai' exists with correct schema
+// Helper: Clean and format JSON for MySQL JSON or LONGTEXT column
+function cleanJsonForSql($val) {
+    if ($val === null) return null;
+    if (is_array($val) || is_object($val)) {
+        return json_encode($val, JSON_UNESCAPED_UNICODE);
+    }
+    if (is_string($val)) {
+        $trimmed = trim($val);
+        if ($trimmed === '' || $trimmed === '-' || $trimmed === '0' || strtolower($trimmed) === 'null') return null;
+        // Verify JSON validity
+        $decoded = json_decode($trimmed);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return $trimmed;
+        }
+    }
+    return null;
+}
+
+// Helper: Inspect actual columns of a MySQL table
+function getTableColumns($pdo, $tableName = 'pegawai', $forceRefresh = false) {
+    static $columnsCache = [];
+    if (!$forceRefresh && isset($columnsCache[$tableName])) return $columnsCache[$tableName];
+    if (!$pdo) return [];
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM `$tableName`");
+        $cols = [];
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $cols[$r['Field']] = [
+                'type' => strtolower($r['Type']),
+                'null' => strtoupper($r['Null']) === 'YES',
+                'default' => $r['Default']
+            ];
+        }
+        $columnsCache[$tableName] = $cols;
+        return $cols;
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+// Helper: Ensure MySQL table 'pegawai' exists and has all required columns
 function ensureMySqlTablesExist($pdo) {
     static $checked = false;
     if ($checked || !$pdo) return;
@@ -127,6 +176,7 @@ function ensureMySqlTablesExist($pdo) {
           `agama` VARCHAR(30) DEFAULT NULL,
           `status_nikah` VARCHAR(30) DEFAULT NULL,
           `status_pegawai` VARCHAR(50) DEFAULT 'PNS',
+          `jenis_kontrak` VARCHAR(50) DEFAULT 'Tetap',
           `tempat_tugas` VARCHAR(150) DEFAULT 'Puskesmas Kepulauan Seribu Selatan',
           `jabatan` VARCHAR(150) DEFAULT NULL,
           `jabatan_orb` VARCHAR(150) DEFAULT NULL,
@@ -136,6 +186,8 @@ function ensureMySqlTablesExist($pdo) {
           `kategori` VARCHAR(50) DEFAULT 'Tenaga Medis',
           `pangkat_gol` VARCHAR(50) DEFAULT NULL,
           `tmt` DATE DEFAULT NULL,
+          `tmt_pangkat` DATE DEFAULT NULL,
+          `atasan` VARCHAR(150) DEFAULT NULL,
           `kondisi` VARCHAR(50) DEFAULT 'Aktif',
           `str` VARCHAR(100) DEFAULT NULL,
           `aktif_str` DATE DEFAULT NULL,
@@ -143,7 +195,14 @@ function ensureMySqlTablesExist($pdo) {
           `aktif_sip` DATE DEFAULT NULL,
           `no_hp` VARCHAR(30) DEFAULT NULL,
           `email` VARCHAR(100) DEFAULT NULL,
+          `foto` LONGTEXT DEFAULT NULL,
           `alamat` TEXT DEFAULT NULL,
+          `rt_rw` VARCHAR(50) DEFAULT NULL,
+          `kelurahan` VARCHAR(100) DEFAULT NULL,
+          `kecamatan` VARCHAR(100) DEFAULT NULL,
+          `kota` VARCHAR(100) DEFAULT NULL,
+          `provinsi` VARCHAR(100) DEFAULT NULL,
+          `kodepos` VARCHAR(20) DEFAULT NULL,
           `riwayat_jabatan` LONGTEXT DEFAULT NULL,
           `riwayat_pendidikan` LONGTEXT DEFAULT NULL,
           `riwayat_keluarga` LONGTEXT DEFAULT NULL,
@@ -156,7 +215,36 @@ function ensureMySqlTablesExist($pdo) {
           KEY `idx_nip` (`nip`),
           KEY `idx_nik` (`nik`),
           KEY `idx_unit` (`tempat_tugas`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+        // Safe auto-migration for missing columns if table pre-existed with older schema
+        $cols = getTableColumns($pdo, 'pegawai');
+        $alterList = [
+            'jenis_kontrak' => 'VARCHAR(50) DEFAULT "Tetap"',
+            'tmt_pangkat' => 'DATE DEFAULT NULL',
+            'atasan' => 'VARCHAR(150) DEFAULT NULL',
+            'foto' => 'LONGTEXT DEFAULT NULL',
+            'rt_rw' => 'VARCHAR(50) DEFAULT NULL',
+            'kelurahan' => 'VARCHAR(100) DEFAULT NULL',
+            'kecamatan' => 'VARCHAR(100) DEFAULT NULL',
+            'kota' => 'VARCHAR(100) DEFAULT NULL',
+            'provinsi' => 'VARCHAR(100) DEFAULT NULL',
+            'kodepos' => 'VARCHAR(20) DEFAULT NULL',
+            'jabatan_orb' => 'VARCHAR(150) DEFAULT NULL',
+            'jabatan_kepmenpan' => 'VARCHAR(150) DEFAULT NULL',
+            'status_rumpun' => 'VARCHAR(100) DEFAULT NULL',
+            'uraian_tugas' => 'LONGTEXT DEFAULT NULL',
+            'data_gaji' => 'LONGTEXT DEFAULT NULL',
+            'dokumen' => 'LONGTEXT DEFAULT NULL'
+        ];
+        foreach ($alterList as $colName => $colDef) {
+            if (!isset($cols[$colName])) {
+                try {
+                    $pdo->exec("ALTER TABLE `pegawai` ADD COLUMN `$colName` $colDef");
+                } catch (Exception $e) {}
+            }
+        }
+        getTableColumns($pdo, 'pegawai', true);
     } catch (Exception $e) {
         error_log("Table check warning: " . $e->getMessage());
     }
@@ -210,8 +298,8 @@ function findPegawaiIndexInPhpList($item, $list) {
     return -1;
 }
 
-// Helper: MySQL PDO Save / Update Pegawai directly in Hostinger MySQL table
-function syncPegawaiToMySql($pdo, $p) {
+// Helper: MySQL PDO Save / Update Pegawai directly in Hostinger MySQL table with full strict-mode safety
+function syncPegawaiToMySql($pdo, $p, $isExplicitNew = false) {
     if (!$pdo || !is_array($p)) return false;
     ensureMySqlTablesExist($pdo);
 
@@ -237,135 +325,203 @@ function syncPegawaiToMySql($pdo, $p) {
         $nip = '';
     }
 
-    if (empty($nama) && empty($nip) && empty($nik)) return false;
-
-    // Normalisasi jenis kelamin
-    $rawJk = isset($p['jenis_kelamin']) ? trim($p['jenis_kelamin']) : '';
-    $jenisKelamin = 'Laki-laki';
-    if (preg_match('/^(p|perempuan|wanita)/i', $rawJk)) {
-        $jenisKelamin = 'Perempuan';
+    if (empty($nama) && empty($nip) && empty($nik)) {
+        $GLOBALS['lastMySqlError'] = "Nama, NIP, atau NIK wajib diisi untuk menyimpan ke database.";
+        return false;
     }
 
     try {
         $existingId = null;
 
-        // 1. Cari berdasarkan NIP valid
-        if (!empty($nip) && $nip !== '-' && preg_match('/^\d{8,}$/', $nip)) {
-            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE nip = :nip LIMIT 1");
-            $stmt->execute([':nip' => $nip]);
-            $row = $stmt->fetch();
-            if ($row) $existingId = $row['id'];
-        }
-
-        // 2. Cari berdasarkan NIK valid
-        if (!$existingId && !empty($nik) && $nik !== '-' && preg_match('/^\d{10,}$/', $nik)) {
-            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE nik = :nik LIMIT 1");
-            $stmt->execute([':nik' => $nik]);
-            $row = $stmt->fetch();
-            if ($row) $existingId = $row['id'];
-        }
-
-        // 3. Cari berdasarkan NRK valid
-        if (!$existingId && !empty($p['nrk']) && trim($p['nrk']) !== '-' && strlen(trim($p['nrk'])) >= 4) {
-            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE nrk = :nrk LIMIT 1");
-            $stmt->execute([':nrk' => trim($p['nrk'])]);
-            $row = $stmt->fetch();
-            if ($row) $existingId = $row['id'];
-        }
-
-        // 4. Cari berdasarkan exact nama
-        if (!$existingId && !empty($nama) && strlen($nama) >= 4) {
-            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE LOWER(TRIM(nama)) = LOWER(TRIM(:nama)) LIMIT 1");
-            $stmt->execute([':nama' => $nama]);
-            $row = $stmt->fetch();
-            if ($row) $existingId = $row['id'];
-        }
-
-        // 5. Cari berdasarkan ID numerik eksplisit
-        if (!$existingId && !empty($p['id']) && is_numeric($p['id'])) {
-            $stmt = $pdo->prepare("SELECT id FROM pegawai WHERE id = :id LIMIT 1");
+        // 1. Cari berdasarkan ID numerik eksplisit (jika mode edit)
+        if (!empty($p['id']) && is_numeric($p['id'])) {
+            $stmt = $pdo->prepare("SELECT id FROM `pegawai` WHERE id = :id LIMIT 1");
             $stmt->execute([':id' => $p['id']]);
             $row = $stmt->fetch();
             if ($row) $existingId = $row['id'];
         }
 
-        $tanggal_lahir = cleanDateForSql(isset($p['tanggal_lahir']) ? $p['tanggal_lahir'] : (isset($p['tgl_lahir']) ? $p['tgl_lahir'] : null));
-        $tmt = cleanDateForSql(isset($p['tmt']) ? $p['tmt'] : (isset($p['tmt_ukpd']) ? $p['tmt_ukpd'] : null));
-        $aktif_str = cleanDateForSql(isset($p['aktif_str']) ? $p['aktif_str'] : (isset($p['m_str']) ? $p['m_str'] : null));
-        $aktif_sip = cleanDateForSql(isset($p['aktif_sip']) ? $p['aktif_sip'] : (isset($p['m_sip']) ? $p['m_sip'] : null));
+        // 2. Cari berdasarkan NIP valid
+        if (!$existingId && !empty($nip) && $nip !== '-' && preg_match('/^\d{8,}$/', $nip)) {
+            $stmt = $pdo->prepare("SELECT id FROM `pegawai` WHERE nip = :nip LIMIT 1");
+            $stmt->execute([':nip' => $nip]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
 
-        $riwayatKeluarga = isset($p['riwayat_keluarga']) ? (is_string($p['riwayat_keluarga']) ? $p['riwayat_keluarga'] : json_encode($p['riwayat_keluarga'])) : null;
-        $riwayatJabatan = isset($p['riwayat_jabatan']) ? (is_string($p['riwayat_jabatan']) ? $p['riwayat_jabatan'] : json_encode($p['riwayat_jabatan'])) : null;
-        $riwayatPendidikan = isset($p['riwayat_pendidikan']) ? (is_string($p['riwayat_pendidikan']) ? $p['riwayat_pendidikan'] : json_encode($p['riwayat_pendidikan'])) : null;
-        $riwayatDiklat = isset($p['riwayat_diklat']) ? (is_string($p['riwayat_diklat']) ? $p['riwayat_diklat'] : json_encode($p['riwayat_diklat'])) : null;
-        $uraianTugas = isset($p['uraian_tugas']) ? (is_string($p['uraian_tugas']) ? $p['uraian_tugas'] : json_encode($p['uraian_tugas'])) : null;
-        $dataGaji = isset($p['data_gaji']) ? (is_string($p['data_gaji']) ? $p['data_gaji'] : json_encode($p['data_gaji'])) : null;
-        $dokumen = isset($p['dokumen']) ? (is_string($p['dokumen']) ? $p['dokumen'] : json_encode($p['dokumen'])) : null;
+        // 3. Cari berdasarkan NIK valid
+        if (!$existingId && !empty($nik) && $nik !== '-' && preg_match('/^\d{10,}$/', $nik)) {
+            $stmt = $pdo->prepare("SELECT id FROM `pegawai` WHERE nik = :nik LIMIT 1");
+            $stmt->execute([':nik' => $nik]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
 
-        $params = [
-            ':nik' => $nik ? substr($nik, 0, 30) : null,
-            ':nip' => $nip ? substr($nip, 0, 30) : null,
-            ':nrk' => isset($p['nrk']) && trim($p['nrk']) !== '-' ? substr(trim($p['nrk']), 0, 30) : null,
-            ':nama' => substr($nama, 0, 150),
-            ':gelar_depan' => isset($p['gelar_depan']) ? substr(trim($p['gelar_depan']), 0, 30) : null,
-            ':gelar_belakang' => isset($p['gelar_belakang']) ? substr(trim($p['gelar_belakang']), 0, 30) : null,
-            ':jenis_kelamin' => $jenisKelamin,
-            ':tempat_lahir' => isset($p['tempat_lahir']) ? substr(trim($p['tempat_lahir']), 0, 100) : null,
-            ':tanggal_lahir' => $tanggal_lahir,
-            ':agama' => isset($p['agama']) ? substr(trim($p['agama']), 0, 30) : 'Islam',
-            ':status_nikah' => $statusNikah ?: 'Kawin',
-            ':status_pegawai' => isset($p['status_pegawai']) ? substr(trim($p['status_pegawai']), 0, 50) : 'PNS',
-            ':tempat_tugas' => isset($p['tempat_tugas']) ? substr(trim($p['tempat_tugas']), 0, 150) : 'Puskesmas Kepulauan Seribu Selatan',
-            ':jabatan' => isset($p['jabatan']) ? substr(trim($p['jabatan']), 0, 150) : '',
-            ':jabatan_orb' => isset($p['jabatan_orb']) ? substr(trim($p['jabatan_orb']), 0, 150) : (isset($p['jabatan_pergub']) ? substr(trim($p['jabatan_pergub']), 0, 150) : ''),
-            ':jabatan_kepmenpan' => isset($p['jabatan_kepmenpan']) ? substr(trim($p['jabatan_kepmenpan']), 0, 150) : (isset($p['jabatan_permenpan11']) ? substr(trim($p['jabatan_permenpan11']), 0, 150) : ''),
-            ':rumpun' => isset($p['rumpun']) ? substr(trim($p['rumpun']), 0, 100) : '',
-            ':status_rumpun' => isset($p['status_rumpun']) ? substr(trim($p['status_rumpun']), 0, 100) : '',
-            ':kategori' => isset($p['kategori']) ? substr(trim($p['kategori']), 0, 50) : 'Tenaga Medis',
-            ':pangkat_gol' => isset($p['pangkat_gol']) ? substr(trim($p['pangkat_gol']), 0, 50) : '',
-            ':tmt' => $tmt,
-            ':kondisi' => isset($p['kondisi']) ? substr(trim($p['kondisi']), 0, 50) : 'Aktif',
-            ':str' => isset($p['str']) ? substr(trim($p['str']), 0, 100) : '',
-            ':aktif_str' => $aktif_str,
-            ':sip' => isset($p['sip']) ? substr(trim($p['sip']), 0, 100) : '',
-            ':aktif_sip' => $aktif_sip,
-            ':no_hp' => isset($p['no_hp']) ? substr(trim($p['no_hp']), 0, 30) : (isset($p['hp']) ? substr(trim($p['hp']), 0, 30) : ''),
-            ':email' => isset($p['email']) ? substr(trim($p['email']), 0, 100) : '',
-            ':alamat' => isset($p['alamat']) ? trim($p['alamat']) : '',
-            ':riwayat_keluarga' => $riwayatKeluarga,
-            ':riwayat_jabatan' => $riwayatJabatan,
-            ':riwayat_pendidikan' => $riwayatPendidikan,
-            ':riwayat_diklat' => $riwayatDiklat,
-            ':uraian_tugas' => $uraianTugas,
-            ':data_gaji' => $dataGaji,
-            ':dokumen' => $dokumen
+        // 4. Cari berdasarkan NRK valid
+        if (!$existingId && !empty($p['nrk']) && trim($p['nrk']) !== '-' && strlen(trim($p['nrk'])) >= 4) {
+            $stmt = $pdo->prepare("SELECT id FROM `pegawai` WHERE nrk = :nrk LIMIT 1");
+            $stmt->execute([':nrk' => trim($p['nrk'])]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
+
+        // 5. Cari berdasarkan exact nama hanya jika BUKAN penambahan baru eksplisit
+        if (!$existingId && !$isExplicitNew && !empty($nama) && strlen($nama) >= 4) {
+            $stmt = $pdo->prepare("SELECT id FROM `pegawai` WHERE LOWER(TRIM(nama)) = LOWER(TRIM(:nama)) LIMIT 1");
+            $stmt->execute([':nama' => $nama]);
+            $row = $stmt->fetch();
+            if ($row) $existingId = $row['id'];
+        }
+
+        // Dapatkan kolom aktual tabel pegawai di MySQL Hostinger
+        $actualCols = getTableColumns($pdo, 'pegawai');
+        if (empty($actualCols)) {
+            $GLOBALS['lastMySqlError'] = "Tabel pegawai tidak ditemukan di database MySQL.";
+            return false;
+        }
+
+        // Normalisasi jenis kelamin
+        $rawJk = isset($p['jenis_kelamin']) ? trim($p['jenis_kelamin']) : '';
+        $jenisKelamin = (preg_match('/^(p|perempuan|wanita)/i', $rawJk)) ? 'Perempuan' : 'Laki-laki';
+
+        // Definisi nilai terformat untuk setiap kolom
+        $colValues = [
+            'nik' => $nik ? substr($nik, 0, 30) : null,
+            'nip' => $nip ? substr($nip, 0, 30) : null,
+            'nrk' => (isset($p['nrk']) && trim($p['nrk']) !== '-') ? substr(trim($p['nrk']), 0, 30) : null,
+            'nama' => substr($nama, 0, 150),
+            'gelar_depan' => (isset($p['gelar_depan']) && trim($p['gelar_depan']) !== '') ? substr(trim($p['gelar_depan']), 0, 30) : null,
+            'gelar_belakang' => (isset($p['gelar_belakang']) && trim($p['gelar_belakang']) !== '') ? substr(trim($p['gelar_belakang']), 0, 30) : null,
+            'jenis_kelamin' => $jenisKelamin,
+            'tempat_lahir' => (isset($p['tempat_lahir']) && trim($p['tempat_lahir']) !== '') ? substr(trim($p['tempat_lahir']), 0, 100) : null,
+            'tanggal_lahir' => cleanDateForSql(isset($p['tanggal_lahir']) ? $p['tanggal_lahir'] : (isset($p['tgl_lahir']) ? $p['tgl_lahir'] : null)),
+            'agama' => (isset($p['agama']) && trim($p['agama']) !== '') ? substr(trim($p['agama']), 0, 30) : 'Islam',
+            'status_nikah' => !empty($statusNikah) ? substr($statusNikah, 0, 30) : 'Kawin',
+            'status_pegawai' => (isset($p['status_pegawai']) && trim($p['status_pegawai']) !== '') ? substr(trim($p['status_pegawai']), 0, 50) : 'PNS',
+            'jenis_kontrak' => (isset($p['jenis_kontrak']) && trim($p['jenis_kontrak']) !== '') ? substr(trim($p['jenis_kontrak']), 0, 50) : 'Tetap',
+            'tempat_tugas' => (isset($p['tempat_tugas']) && trim($p['tempat_tugas']) !== '') ? substr(trim($p['tempat_tugas']), 0, 150) : (isset($p['nama_ukpd']) ? substr(trim($p['nama_ukpd']), 0, 150) : 'Puskesmas Kepulauan Seribu Selatan'),
+            'jabatan' => (isset($p['jabatan']) && trim($p['jabatan']) !== '') ? substr(trim($p['jabatan']), 0, 150) : null,
+            'jabatan_orb' => (isset($p['jabatan_orb']) && trim($p['jabatan_orb']) !== '') ? substr(trim($p['jabatan_orb']), 0, 150) : (isset($p['jabatan_pergub']) ? substr(trim($p['jabatan_pergub']), 0, 150) : null),
+            'jabatan_kepmenpan' => (isset($p['jabatan_kepmenpan']) && trim($p['jabatan_kepmenpan']) !== '') ? substr(trim($p['jabatan_kepmenpan']), 0, 150) : (isset($p['jabatan_permenpan11']) ? substr(trim($p['jabatan_permenpan11']), 0, 150) : null),
+            'rumpun' => (isset($p['rumpun']) && trim($p['rumpun']) !== '') ? substr(trim($p['rumpun']), 0, 100) : null,
+            'status_rumpun' => (isset($p['status_rumpun']) && trim($p['status_rumpun']) !== '') ? substr(trim($p['status_rumpun']), 0, 100) : null,
+            'kategori' => (isset($p['kategori']) && trim($p['kategori']) !== '') ? substr(trim($p['kategori']), 0, 50) : 'Tenaga Medis',
+            'pangkat_gol' => (isset($p['pangkat_gol']) && trim($p['pangkat_gol']) !== '') ? substr(trim($p['pangkat_gol']), 0, 50) : null,
+            'tmt' => cleanDateForSql(isset($p['tmt']) ? $p['tmt'] : (isset($p['tmt_ukpd']) ? $p['tmt_ukpd'] : null)),
+            'tmt_pangkat' => cleanDateForSql(isset($p['tmt_pangkat']) ? $p['tmt_pangkat'] : null),
+            'atasan' => (isset($p['atasan']) && trim($p['atasan']) !== '') ? substr(trim($p['atasan']), 0, 150) : (isset($p['atasan_langsung']) ? substr(trim($p['atasan_langsung']), 0, 150) : null),
+            'kondisi' => (isset($p['kondisi']) && trim($p['kondisi']) !== '') ? substr(trim($p['kondisi']), 0, 50) : 'Aktif',
+            'str' => (isset($p['str']) && trim($p['str']) !== '') ? substr(trim($p['str']), 0, 100) : null,
+            'aktif_str' => cleanDateForSql(isset($p['aktif_str']) ? $p['aktif_str'] : (isset($p['m_str']) ? $p['m_str'] : null)),
+            'sip' => (isset($p['sip']) && trim($p['sip']) !== '') ? substr(trim($p['sip']), 0, 100) : null,
+            'aktif_sip' => cleanDateForSql(isset($p['aktif_sip']) ? $p['aktif_sip'] : (isset($p['m_sip']) ? $p['m_sip'] : null)),
+            'no_hp' => (isset($p['no_hp']) && trim($p['no_hp']) !== '') ? substr(trim($p['no_hp']), 0, 30) : (isset($p['hp']) ? substr(trim($p['hp']), 0, 30) : null),
+            'email' => (isset($p['email']) && trim($p['email']) !== '') ? substr(trim($p['email']), 0, 100) : null,
+            'foto' => (isset($p['foto']) && !empty($p['foto'])) ? $p['foto'] : null,
+            'alamat' => (isset($p['alamat']) && trim($p['alamat']) !== '') ? trim($p['alamat']) : null,
+            'rt_rw' => (isset($p['rt_rw']) && trim($p['rt_rw']) !== '') ? substr(trim($p['rt_rw']), 0, 50) : null,
+            'kelurahan' => (isset($p['kelurahan']) && trim($p['kelurahan']) !== '') ? substr(trim($p['kelurahan']), 0, 100) : null,
+            'kecamatan' => (isset($p['kecamatan']) && trim($p['kecamatan']) !== '') ? substr(trim($p['kecamatan']), 0, 100) : null,
+            'kota' => (isset($p['kota']) && trim($p['kota']) !== '') ? substr(trim($p['kota']), 0, 100) : null,
+            'provinsi' => (isset($p['provinsi']) && trim($p['provinsi']) !== '') ? substr(trim($p['provinsi']), 0, 100) : null,
+            'kodepos' => (isset($p['kodepos']) && trim($p['kodepos']) !== '') ? substr(trim($p['kodepos']), 0, 20) : null,
+            'riwayat_keluarga' => cleanJsonForSql(isset($p['riwayat_keluarga']) ? $p['riwayat_keluarga'] : (isset($p['keluarga']) ? $p['keluarga'] : null)),
+            'riwayat_jabatan' => cleanJsonForSql(isset($p['riwayat_jabatan']) ? $p['riwayat_jabatan'] : (isset($p['jabatan_history']) ? $p['jabatan_history'] : null)),
+            'riwayat_pendidikan' => cleanJsonForSql(isset($p['riwayat_pendidikan']) ? $p['riwayat_pendidikan'] : (isset($p['pendidikan_history']) ? $p['pendidikan_history'] : null)),
+            'riwayat_diklat' => cleanJsonForSql(isset($p['riwayat_diklat']) ? $p['riwayat_diklat'] : null),
+            'uraian_tugas' => cleanJsonForSql(isset($p['uraian_tugas']) ? $p['uraian_tugas'] : null),
+            'data_gaji' => cleanJsonForSql(isset($p['data_gaji']) ? $p['data_gaji'] : (isset($p['gaji_history']) ? $p['gaji_history'] : null)),
+            'dokumen' => cleanJsonForSql(isset($p['dokumen']) ? $p['dokumen'] : null)
         ];
 
+        // Saring hanya kolom yang benar-benar ada di tabel database MySQL
+        $fieldsToUse = [];
+        $params = [];
+        foreach ($colValues as $col => $val) {
+            if (isset($actualCols[$col])) {
+                // If column is NOT NULL without default in MySQL and value is NULL, supply safe non-null fallback
+                if ($val === null && isset($actualCols[$col]['null']) && !$actualCols[$col]['null'] && $actualCols[$col]['default'] === null) {
+                    $type = isset($actualCols[$col]['type']) ? strtolower($actualCols[$col]['type']) : '';
+                    if (strpos($type, 'int') !== false || strpos($type, 'decimal') !== false || strpos($type, 'float') !== false) {
+                        $val = 0;
+                    } elseif (strpos($type, 'date') !== false) {
+                        $val = '1970-01-01';
+                    } else {
+                        $val = '-';
+                    }
+                }
+                // Auto-truncate to column length if varchar
+                if (is_string($val) && isset($actualCols[$col]['type']) && preg_match('/varchar\((\d+)\)/', $actualCols[$col]['type'], $mLen)) {
+                    $maxLen = (int) $mLen[1];
+                    if (strlen($val) > $maxLen) {
+                        $val = substr($val, 0, $maxLen);
+                    }
+                }
+                $fieldsToUse[$col] = $val;
+                $params[':' . $col] = $val;
+            }
+        }
+
+        // Pastikan kolom NOT NULL lain yang ada di database memiliki nilai default aman saat INSERT
+        if (!$existingId) {
+            foreach ($actualCols as $colName => $colMeta) {
+                if ($colName === 'id' || isset($fieldsToUse[$colName])) continue;
+                if (!$colMeta['null'] && $colMeta['default'] === null) {
+                    $type = strtolower($colMeta['type']);
+                    if (strpos($type, 'int') !== false || strpos($type, 'decimal') !== false || strpos($type, 'float') !== false) {
+                        $defVal = 0;
+                    } elseif (strpos($type, 'date') !== false) {
+                        $defVal = '1970-01-01';
+                    } else {
+                        $defVal = '-';
+                    }
+                    $fieldsToUse[$colName] = $defVal;
+                    $params[':' . $colName] = $defVal;
+                }
+            }
+        }
+
+        if (empty($fieldsToUse)) {
+            $GLOBALS['lastMySqlError'] = "Tidak ada kolom yang cocok untuk disimpan ke tabel pegawai.";
+            return false;
+        }
+
         if ($existingId) {
-            $params[':id'] = $existingId;
-            $sql = "UPDATE pegawai SET nik=:nik, nip=:nip, nrk=:nrk, nama=:nama, gelar_depan=:gelar_depan, gelar_belakang=:gelar_belakang,
-                    jenis_kelamin=:jenis_kelamin, tempat_lahir=:tempat_lahir, tanggal_lahir=:tanggal_lahir, agama=:agama, status_nikah=:status_nikah,
-                    status_pegawai=:status_pegawai, tempat_tugas=:tempat_tugas, jabatan=:jabatan, jabatan_orb=:jabatan_orb, jabatan_kepmenpan=:jabatan_kepmenpan,
-                    rumpun=:rumpun, status_rumpun=:status_rumpun, kategori=:kategori, pangkat_gol=:pangkat_gol, tmt=:tmt, kondisi=:kondisi,
-                    str=:str, aktif_str=:aktif_str, sip=:sip, aktif_sip=:aktif_sip, no_hp=:no_hp, email=:email, alamat=:alamat,
-                    riwayat_keluarga=:riwayat_keluarga, riwayat_jabatan=:riwayat_jabatan, riwayat_pendidikan=:riwayat_pendidikan,
-                    riwayat_diklat=:riwayat_diklat, uraian_tugas=:uraian_tugas, data_gaji=:data_gaji, dokumen=:dokumen
-                    WHERE id = :id";
+            // UPDATE
+            $params[':_existing_id'] = $existingId;
+            $setClauses = [];
+            foreach ($fieldsToUse as $col => $val) {
+                $setClauses[] = "`$col` = :$col";
+            }
+            $sql = "UPDATE `pegawai` SET " . implode(', ', $setClauses) . " WHERE `id` = :_existing_id";
             $stmt = $pdo->prepare($sql);
-            return $stmt->execute($params);
+            $res = $stmt->execute($params);
+            if (!$res) {
+                $err = $stmt->errorInfo();
+                $GLOBALS['lastMySqlError'] = isset($err[2]) ? $err[2] : "Gagal mengeksekusi UPDATE MySQL";
+                return false;
+            }
+            return true;
         } else {
-            $sql = "INSERT INTO pegawai (nik, nip, nrk, nama, gelar_depan, gelar_belakang, jenis_kelamin, tempat_lahir, tanggal_lahir, agama, status_nikah,
-                    status_pegawai, tempat_tugas, jabatan, jabatan_orb, jabatan_kepmenpan, rumpun, status_rumpun, kategori, pangkat_gol, tmt, kondisi,
-                    str, aktif_str, sip, aktif_sip, no_hp, email, alamat,
-                    riwayat_keluarga, riwayat_jabatan, riwayat_pendidikan, riwayat_diklat, uraian_tugas, data_gaji, dokumen)
-                    VALUES (:nik, :nip, :nrk, :nama, :gelar_depan, :gelar_belakang, :jenis_kelamin, :tempat_lahir, :tanggal_lahir, :agama, :status_nikah,
-                    :status_pegawai, :tempat_tugas, :jabatan, :jabatan_orb, :jabatan_kepmenpan, :rumpun, :status_rumpun, :kategori, :pangkat_gol, :tmt, :kondisi,
-                    :str, :aktif_str, :sip, :aktif_sip, :no_hp, :email, :alamat,
-                    :riwayat_keluarga, :riwayat_jabatan, :riwayat_pendidikan, :riwayat_diklat, :uraian_tugas, :data_gaji, :dokumen)";
+            // INSERT
+            $colsList = [];
+            $placeholders = [];
+            foreach ($fieldsToUse as $col => $val) {
+                $colsList[] = "`$col`";
+                $placeholders[] = ":$col";
+            }
+            $sql = "INSERT INTO `pegawai` (" . implode(', ', $colsList) . ") VALUES (" . implode(', ', $placeholders) . ")";
             $stmt = $pdo->prepare($sql);
-            return $stmt->execute($params);
+            $res = $stmt->execute($params);
+            if (!$res) {
+                $err = $stmt->errorInfo();
+                $GLOBALS['lastMySqlError'] = isset($err[2]) ? $err[2] : "Gagal mengeksekusi INSERT MySQL";
+                return false;
+            }
+            return true;
         }
     } catch (Exception $e) {
+        $GLOBALS['lastMySqlError'] = $e->getMessage();
         error_log("Error syncPegawaiToMySql: " . $e->getMessage());
         return false;
     }
@@ -407,11 +563,23 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
 $inputRaw = file_get_contents('php://input');
 $inputData = json_decode($inputRaw, true);
 
+if (empty($inputData) && !empty($_POST)) {
+    $inputData = $_POST;
+    if (isset($_POST['data']) && is_string($_POST['data'])) {
+        $decoded = json_decode($_POST['data'], true);
+        if ($decoded) $inputData['data'] = $decoded;
+    }
+}
+
 if (!$action && is_array($inputData) && isset($inputData['action'])) {
     $action = $inputData['action'];
 }
 
 $payload = (is_array($inputData) && isset($inputData['data'])) ? $inputData['data'] : (is_array($inputData) ? $inputData : []);
+if (is_string($payload)) {
+    $decodedPayload = json_decode($payload, true);
+    if (is_array($decodedPayload)) $payload = $decodedPayload;
+}
 
 $db = readAppStorage($jsonDbFile);
 
@@ -421,13 +589,21 @@ switch ($action) {
     // 0. TEST DATABASE & SERVER CONNECTION
     case 'testConnection':
     case 'checkDatabase':
+        $pegawaiCount = 0;
+        if ($pdo) {
+            try {
+                $cntStmt = $pdo->query("SELECT COUNT(*) FROM `pegawai`");
+                $pegawaiCount = (int)$cntStmt->fetchColumn();
+            } catch (Exception $e) {}
+        }
         echo json_encode([
             'success' => true,
             'pdo_connected' => ($pdo !== null),
             'database_name' => (!empty($dbName) && $dbName !== 'u123456789_simpeg_pkss') ? $dbName : 'Fallback JSON Storage',
+            'total_pegawai_db' => $pegawaiCount,
             'json_storage' => file_exists($jsonDbFile),
             'timestamp' => date('Y-m-d H:i:s'),
-            'message' => ($pdo !== null) ? 'Koneksi database MySQL Hostinger aktif.' : 'Menggunakan fallback penyimpanan file JSON lokal server.'
+            'message' => ($pdo !== null) ? "Koneksi database MySQL Hostinger aktif ({$pegawaiCount} pegawai terdaftar di database)." : 'Menggunakan fallback penyimpanan file JSON lokal server.'
         ], JSON_UNESCAPED_UNICODE);
         exit;
 
@@ -620,10 +796,12 @@ switch ($action) {
             exit;
         }
 
+        $isExplicitNew = ($action === 'simpanPegawaiBaru' || $action === 'simpanPegawai');
+
         // 1. Eksekusi Langsung ke Tabel MySQL Hostinger jika terhubung
         $mysqlOk = false;
         if ($pdo) {
-            $mysqlOk = syncPegawaiToMySql($pdo, $payload);
+            $mysqlOk = syncPegawaiToMySql($pdo, $payload, $isExplicitNew);
         }
 
         $allPegawai = isset($db['pegawai']) && is_array($db['pegawai']) ? $db['pegawai'] : [];
@@ -649,22 +827,42 @@ switch ($action) {
 
         if ($foundIdx >= 0) {
             $allPegawai[$foundIdx] = array_merge($allPegawai[$foundIdx], $payload);
-            $msg = "Data pegawai berhasil diperbarui di Database MySQL Hostinger!";
+            $msg = $mysqlOk ? "Data pegawai berhasil diperbarui di Database MySQL Hostinger!" : ($pdo ? "Gagal update ke MySQL: " . ($GLOBALS['lastMySqlError'] ?: 'Unknown error') : "Data pegawai berhasil diperbarui!");
         } else {
             if (!isset($payload['rowIndex'])) {
                 $payload['rowIndex'] = count($allPegawai) + 2;
             }
             $allPegawai[] = $payload;
-            $msg = "Data pegawai baru berhasil disimpan ke Database MySQL Hostinger!";
+            $msg = $mysqlOk ? "Data pegawai baru berhasil disimpan ke Database MySQL Hostinger!" : ($pdo ? "Gagal INSERT ke MySQL: " . ($GLOBALS['lastMySqlError'] ?: 'Unknown error') : "Data pegawai baru berhasil disimpan!");
+        }
+
+        if ($pdo && $mysqlOk) {
+            try {
+                $stmtPeg = $pdo->query("SELECT * FROM `pegawai` ORDER BY id ASC");
+                $dbRows = $stmtPeg->fetchAll();
+                if (!empty($dbRows)) {
+                    foreach ($dbRows as $idx => &$row) {
+                        if (!isset($row['rowIndex']) || empty($row['rowIndex'])) {
+                            $row['rowIndex'] = $idx + 2;
+                        }
+                    }
+                    $allPegawai = $dbRows;
+                }
+            } catch (Exception $e) {}
         }
 
         $db['pegawai'] = $allPegawai;
         saveAppStorage($jsonDbFile, $db);
 
+        // Jika pdo terhubung, success mencerminkan keberhasilan MySQL
+        $finalSuccess = ($pdo !== null) ? $mysqlOk : true;
+
         echo json_encode([
-            'success' => true,
+            'success' => $finalSuccess,
             'message' => $msg,
             'mysql_synced' => $mysqlOk,
+            'pdo_connected' => ($pdo !== null),
+            'mysql_error' => $GLOBALS['lastMySqlError'] ?? null,
             'total' => count($allPegawai)
         ]);
         exit;

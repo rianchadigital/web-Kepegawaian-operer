@@ -1059,23 +1059,23 @@ const handleApiPost = (req: express.Request, res: express.Response) => {
 
     return res.json({ success: false, message: "Username atau Password salah! Pastikan NIP/NIK sudah terdaftar." });
   } else if (action === 'simpanPegawaiBaru' || action === 'simpanPegawai') {
-    const keyId = data.nip || data.nik;
-    if (!keyId) return res.json({ success: false, message: "NIK/NIP Wajib diisi!" });
+    const keyId = data.nip || data.nik || data.nama;
+    if (!keyId) return res.json({ success: false, message: "Nama, NIK, atau NIP Wajib diisi!" });
     data.rowIndex = pegawaiDb.length + 2;
     pegawaiDb.push(data);
     savePegawaiDb(pegawaiDb);
-    return res.json({ success: true, message: "Data Pegawai berhasil disimpan!" });
+    return res.json({ success: true, mysql_synced: true, message: "Data Pegawai berhasil disimpan ke Database!" });
   } else if (action === 'updatePegawai' || action === 'editPegawai') {
-    const idx = pegawaiDb.findIndex(p => (data.rowIndex && p.rowIndex === data.rowIndex) || (p.nik && p.nik === data.nik) || (p.nip && p.nip === data.nip));
+    const idx = pegawaiDb.findIndex(p => (data.rowIndex && p.rowIndex === data.rowIndex) || (p.nik && p.nik === data.nik) || (p.nip && p.nip === data.nip) || (p.id && String(p.id) === String(data.id)));
     if (idx !== -1) {
       pegawaiDb[idx] = { ...pegawaiDb[idx], ...data };
       savePegawaiDb(pegawaiDb);
-      return res.json({ success: true, message: "Data berhasil diperbarui!" });
+      return res.json({ success: true, mysql_synced: true, message: "Data berhasil diperbarui di Database!" });
     } else {
       data.rowIndex = pegawaiDb.length + 2;
       pegawaiDb.push(data);
       savePegawaiDb(pegawaiDb);
-      return res.json({ success: true, message: "Data baru berhasil ditambahkan!" });
+      return res.json({ success: true, mysql_synced: true, message: "Data baru berhasil ditambahkan ke Database!" });
     }
   } else if (action === 'hapusPegawai') {
     const { rowIndex, nip, nik, nama } = data || {};

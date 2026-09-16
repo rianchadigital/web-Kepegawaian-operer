@@ -425,9 +425,9 @@
         .mobile-bottom-nav li.active a { color: var(--accent-color); background: #EEF2FF;}
 
         #loadingOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.88); z-index: 105000; display: flex; justify-content: center; align-items: center;
-            flex-direction: column; display: none; backdrop-filter: blur(8px);
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
         }
 
         /* WIZARD TAMBAH PEGAWAI STYLING */
@@ -629,11 +629,8 @@
 <body>
 <div id="app-wrapper-override">
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" style="display: none !important;">
-        <div class="spinner-border" style="width: 3.5rem; height: 3.5rem; color: var(--accent-color);" role="status"></div>
-        <h5 class="mt-4 fw-bold" style="color: var(--accent-color);" id="loadingText">Memproses Data...</h5>
-    </div>
+    <!-- Loading Overlay Cleared as Requested -->
+    <div id="loadingOverlay" style="display: none !important; visibility: hidden !important; pointer-events: none !important;"></div>
 
     <!-- AI CHAT WIDGET -->
     <div id="ai-chat-btn" onclick="window.toggleChat()"><i class="fas fa-robot"></i></div>
@@ -1017,6 +1014,9 @@
                                     <li><a class="dropdown-item py-2" href="#" onclick="window.downloadTemplatePegawaiJSON(); return false;"><i class="fas fa-file-code text-warning me-2"></i> Template JSON (.json)</a></li>
                                 </ul>
                             </div>
+                            <button class="btn btn-outline-secondary btn-sm shadow-sm rounded-pill px-3 fw-bold" onclick="window.clearLocalPegawaiStorage(true)" title="Bersihkan penyimpanan lokal browser dan tampilkan murni dari database MySQL">
+                                <i class="fas fa-broom me-1"></i> Bersihkan Cache Lokal
+                            </button>
                             <button class="btn btn-primary btn-sm btn-admin-only btn-tambah-pegawai-only shadow-sm rounded-pill px-4" onclick="window.openTambahPegawaiSection()"><i class="fas fa-plus me-1"></i> Tambah Pegawai</button>
                         </div>
                     </div>
@@ -11398,46 +11398,18 @@
                     return;
                 }
 
-                // Rumahweb Hosting is the SINGLE SOURCE OF TRUTH across all devices
+                // Database MySQL Hostinger adalah SINGLE SOURCE OF TRUTH:
+                // Bersihkan penyimpanan lokal browser dan tampilkan HANYA berdasarkan database yang ada
                 if (Array.isArray(serverBundle.pegawai)) {
-                    let cachedPeg = [];
                     try {
-                        const localRaw = localStorage.getItem('simpeg_pkss_pegawai_db');
-                        if (localRaw) cachedPeg = JSON.parse(localRaw);
+                        localStorage.removeItem('simpeg_pkss_pegawai_db');
+                        localStorage.removeItem('simpeg_tambah_draft');
+                        localStorage.removeItem('simpeg_deleted_pegawai');
+                        localStorage.removeItem('simpeg_pending_hostinger_sync');
                     } catch(e){}
-
-                    // Safeguard: If local cache has uploaded employees and server returned fewer records (e.g. initial seed),
-                    // merge missing local employees so newly uploaded records are NEVER lost on page refresh!
-                    if (Array.isArray(cachedPeg) && cachedPeg.length > serverBundle.pegawai.length) {
-                        const mergedList = [...serverBundle.pegawai];
-                        cachedPeg.forEach(cp => {
-                            if (!cp) return;
-                            const cpNip = cp.nip ? String(cp.nip).trim() : '';
-                            const cpNik = cp.nik ? String(cp.nik).trim() : '';
-                            const cpNama = cp.nama ? String(cp.nama).trim().toLowerCase() : '';
-                            const exists = mergedList.some(m => {
-                                if (!m) return false;
-                                const mNip = m.nip ? String(m.nip).trim() : '';
-                                const mNik = m.nik ? String(m.nik).trim() : '';
-                                const mNama = m.nama ? String(m.nama).trim().toLowerCase() : '';
-                                return (cpNip && cpNip !== '-' && mNip === cpNip) ||
-                                       (cpNik && cpNik !== '-' && mNik === cpNik) ||
-                                       (cpNama && mNama === cpNama);
-                            });
-                            if (!exists) {
-                                mergedList.push(cp);
-                            }
-                        });
-                        serverBundle.pegawai = mergedList;
-                        // Auto sync back to server in background
-                        if (typeof window.saveModuleDataToRumahweb === 'function') {
-                            window.saveModuleDataToRumahweb('savePegawai', mergedList);
-                        }
-                    }
 
                     dataPegawai = serverBundle.pegawai;
                     window.dataPegawai = serverBundle.pegawai;
-                    try { localStorage.setItem('simpeg_pkss_pegawai_db', JSON.stringify(serverBundle.pegawai)); } catch(e){}
                 }
 
                 if (Array.isArray(serverBundle.pengguna)) {
@@ -11566,6 +11538,21 @@
                         });
                 });
         }
+
+        window.clearLocalPegawaiStorage = function(showNotice = false) {
+            try {
+                localStorage.removeItem('simpeg_pkss_pegawai_db');
+                localStorage.removeItem('simpeg_tambah_draft');
+                localStorage.removeItem('simpeg_deleted_pegawai');
+                localStorage.removeItem('simpeg_pending_hostinger_sync');
+                if (showNotice && typeof showToast === 'function') {
+                    showToast("Penyimpanan lokal browser dibersihkan. Memuat ulang murni dari database...", "info");
+                }
+                loadDataFromGAS();
+            } catch(e) {
+                console.error("Gagal membersihkan cache lokal:", e);
+            }
+        };
 
         function refreshAllData() {
             if (window.activeUser) {
@@ -14922,20 +14909,12 @@
                 payload.status_verifikasi_pegawai = 'Menunggu Verifikasi Kepegawaian';
             }
             let action = idx === -1 ? 'simpanPegawaiBaru' : 'updatePegawai';
-            if (idx !== -1) payload.rowIndex = dataPegawai[idx].rowIndex;
+            if (idx !== -1 && dataPegawai[idx]) {
+                payload.rowIndex = dataPegawai[idx].rowIndex;
+                if (dataPegawai[idx].id) payload.id = dataPegawai[idx].id;
+            }
 
             let targetEndpoint = window.getApiEndpoint(action);
-
-            const applyLocalSave = () => {
-                if (idx === -1) {
-                    payload.rowIndex = dataPegawai.length + 2;
-                    dataPegawai.push(payload);
-                } else {
-                    dataPegawai[idx] = { ...dataPegawai[idx], ...payload };
-                }
-                window.savePegawaiToLocalStorage();
-                refreshAllData();
-            };
 
             let doSavePost = function(url) {
                 return fetch(url, {
@@ -14948,34 +14927,37 @@
                 });
             };
 
-            // Immediately update local array & localStorage so user input is never lost or reset
-            applyLocalSave();
+            const submitBtn = $('#formPegawai button[type="submit"]');
+            const origSubmitText = submitBtn.html();
+            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menyimpan ke Database MySQL...');
 
             doSavePost(targetEndpoint)
+                .catch(() => doSavePost('api.php?action=' + action))
                 .then(res => {
-                    if(res.success) {
-                        bootstrap.Modal.getInstance(document.getElementById('modalPegawai')).hide();
-                        showToast("Data pegawai berhasil disimpan & tersimpan di database!", "success");
+                    submitBtn.prop('disabled', false).html(origSubmitText);
+                    if (typeof res === 'string') {
+                        try { res = JSON.parse(res); } catch(e){}
+                    }
+                    if (res && res.success) {
+                        const modalEl = document.getElementById('modalPegawai');
+                        if (modalEl) {
+                            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                            if (modalInstance) modalInstance.hide();
+                        }
+                        try {
+                            localStorage.removeItem('simpeg_pkss_pegawai_db');
+                            localStorage.removeItem('simpeg_pending_hostinger_sync');
+                        } catch(e){}
+                        showToast(res.message || "Data pegawai berhasil disimpan ke Database MySQL!", "success");
+                        loadDataFromGAS();
                     } else {
-                        bootstrap.Modal.getInstance(document.getElementById('modalPegawai')).hide();
-                        showToast("Data tersimpan di browser lokal. (" + (res.message || '') + ")", "info");
+                        const errMsg = (res && (res.mysql_error || res.message)) || "Gagal menyimpan ke Database MySQL!";
+                        showToast(errMsg, "danger");
                     }
                 })
                 .catch(err => {
-                    // Fallback directly to api.php if primary endpoint failed
-                    doSavePost('api.php?action=' + action)
-                        .then(res => {
-                            bootstrap.Modal.getInstance(document.getElementById('modalPegawai')).hide();
-                            if(res.success) {
-                                showToast("Data pegawai berhasil disimpan & disinkronkan!", "success");
-                            } else {
-                                showToast("Data tersimpan di browser lokal.", "info");
-                            }
-                        })
-                        .catch(err2 => {
-                            bootstrap.Modal.getInstance(document.getElementById('modalPegawai')).hide();
-                            showToast("Data tersimpan secara lokal di browser.", "info");
-                        });
+                    submitBtn.prop('disabled', false).html(origSubmitText);
+                    showToast("Gagal menghubungi server database: " + err.message, "danger");
                 });
         });
 
@@ -17920,12 +17902,10 @@
 
             const isEdit = window.editingPegawaiIndex >= 0;
 
-            if (isEdit) {
-                payloadData.rowIndex = dataPegawai[window.editingPegawaiIndex].rowIndex || (window.editingPegawaiIndex + 2);
-                dataPegawai[window.editingPegawaiIndex] = { ...dataPegawai[window.editingPegawaiIndex], ...payloadData };
-            } else {
-                payloadData.rowIndex = dataPegawai.length + 2;
-                dataPegawai.push(payloadData);
+            if (isEdit && window.editingPegawaiIndex >= 0 && dataPegawai[window.editingPegawaiIndex]) {
+                const existingRec = dataPegawai[window.editingPegawaiIndex];
+                if (existingRec.id) payloadData.id = existingRec.id;
+                payloadData.rowIndex = existingRec.rowIndex || (window.editingPegawaiIndex + 2);
             }
 
             if (window.activeUser && isEdit && typeof window.isPegawaiRole === 'function' && window.isPegawaiRole()) {
@@ -17933,10 +17913,14 @@
                 $('#user-display-name').html(`<i class="fas fa-user-circle fs-5 me-2 align-middle text-primary"></i> ${payloadData.nama} (Pegawai)`);
             }
 
-            const savedPegawaiObj = isEdit ? dataPegawai[window.editingPegawaiIndex] : dataPegawai[dataPegawai.length - 1];
-
             let reqAction = isEdit ? 'editPegawai' : 'simpanPegawai';
             let targetUrl = window.getApiEndpoint(reqAction);
+
+            const $btnSave = $('.btn-simpan-wizard, #btnSaveWizard');
+            const origBtnText = $btnSave.length ? $btnSave.html() : '';
+            if ($btnSave.length) {
+                $btnSave.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Menyimpan ke Database MySQL...');
+            }
 
             let doSaveWizardReq = function(url) {
                 return $.ajax({
@@ -17951,30 +17935,48 @@
             };
 
             doSaveWizardReq(targetUrl)
-                .fail(function() {
+                .catch(function() {
                     return doSaveWizardReq('api.php?action=' + reqAction);
                 })
-                .done(function(res) {
+                .then(function(res) {
+                    if ($btnSave.length) {
+                        $btnSave.prop('disabled', false).html(origBtnText);
+                    }
+                    if (typeof res === 'string') {
+                        try { res = JSON.parse(res); } catch(e){}
+                    }
+
+                    if (res && res.success === false) {
+                        const errMsg = res.mysql_error || res.message || "Gagal menyimpan data pegawai ke database MySQL!";
+                        showToast(errMsg, "danger");
+                        return;
+                    }
+
+                    // Berhasil masuk database MySQL!
                     localStorage.removeItem('simpeg_tambah_draft');
                     window.editingPegawaiIndex = -1;
-                    window.savePegawaiToLocalStorage();
-                    if (window.firestoreSync && typeof window.firestoreSync.savePegawai === 'function' && savedPegawaiObj) {
-                        window.firestoreSync.savePegawai(savedPegawaiObj);
-                    }
-                    refreshAllData();
-                    showToast(isEdit ? "Data Pegawai berhasil diperbarui di server Rumahweb!" : "Data Pegawai berhasil ditambahkan ke server Rumahweb!", "success");
+
+                    // Bersihkan cache lokal browser agar murni menampilkan data dari database
+                    try {
+                        localStorage.removeItem('simpeg_pkss_pegawai_db');
+                        localStorage.removeItem('simpeg_pending_hostinger_sync');
+                    } catch(e){}
+
+                    // Muat data terupdate langsung dari database MySQL
+                    loadDataFromGAS();
+
+                    const successNotice = isEdit 
+                        ? "Data Pegawai berhasil diperbarui di Database MySQL!" 
+                        : "Data Pegawai berhasil ditambahkan ke Database MySQL!";
+                    showToast(successNotice, "success");
                     window.cancelWizard();
                 })
                 .fail(function(err) {
-                    localStorage.removeItem('simpeg_tambah_draft');
-                    window.editingPegawaiIndex = -1;
-                    window.savePegawaiToLocalStorage();
-                    if (window.firestoreSync && typeof window.firestoreSync.savePegawai === 'function' && savedPegawaiObj) {
-                        window.firestoreSync.savePegawai(savedPegawaiObj);
+                    if ($btnSave.length) {
+                        $btnSave.prop('disabled', false).html(origBtnText);
                     }
-                    refreshAllData();
-                    showToast(isEdit ? "Data Pegawai diperbarui secara lokal." : "Data Pegawai disimpan secara lokal.", "info");
-                    window.cancelWizard();
+                    const errMsg = (err && err.responseJSON && err.responseJSON.message) || (err && err.statusText) || "Gagal terhubung ke Database MySQL";
+                    showToast("Gagal menyimpan ke Database MySQL: " + errMsg, "danger");
                 });
         };
 
