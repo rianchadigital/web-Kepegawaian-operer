@@ -20,11 +20,11 @@
 // KOSONGKAN JIKA SCRIPT INI DIBUAT DARI MENU "Ekstensi > Apps Script" DI DALAM SPREADSHEET
 var SPREADSHEET_ID = ""; // Contoh: "1abcDEfgHIjkLMnoPQrstUVwxyz123456789"
 
-// ID FOLDER INDUK GOOGLE DRIVE UNTUK MENYIMPAN DOKUMEN PEGAWAI
-// Link Google Drive: https://drive.google.com/drive/u/0/folders/1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR
-var GOOGLE_DRIVE_FOLDER_ID = "1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR";
+// ID FOLDER INDUK GOOGLE DRIVE UNTUK MENYIMPAN FOTO PROFIL & DOKUMEN PEGAWAI
+// Link Google Drive: https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P
+var GOOGLE_DRIVE_FOLDER_ID = "1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P";
 
-var NAMA_FOLDER_INDUK = "SIMPEG_PKSS_ARSIP_DIGITAL";
+var NAMA_FOLDER_INDUK = "SIMPEG_PKSS_FOTO_DAN_ARSIP_DIGITAL";
 
 // ==============================================================================
 // 2. HELPER KONEKSI SPREADSHEET & DRIVE
@@ -315,11 +315,17 @@ function doPost(e) {
     
     switch (action) {
       // -------------------------------------------------------------
-      // UPLOAD DOKUMEN KE GOOGLE DRIVE
+      // UPLOAD DOKUMEN & FOTO PROFIL KE GOOGLE DRIVE
       // -------------------------------------------------------------
       case 'uploadFile':
       case 'uploadDokumen':
       case 'uploadFileToDrive':
+      case 'uploadFoto':
+      case 'uploadFotoProfil':
+      case 'uploadFotoProfilToDrive':
+        if (action === 'uploadFoto' || action === 'uploadFotoProfil' || action === 'uploadFotoProfilToDrive') {
+          payload.jenisDokumen = 'FOTO_PROFIL';
+        }
         result = handleDriveFileUpload(payload);
         break;
         
@@ -602,33 +608,42 @@ function updatePegawaiDocumentLink(nip, jenisDokumen, fileUrl, fileName) {
     var headers = data[0];
     var nipColIdx = headers.indexOf('nip');
     var docColIdx = headers.indexOf('dokumen');
+    var fotoColIdx = headers.indexOf('foto');
     var updatedAtColIdx = headers.indexOf('updated_at');
     
-    if (nipColIdx === -1 || docColIdx === -1) return;
+    if (nipColIdx === -1) return;
     
     for (var r = 1; r < data.length; r++) {
       var rowNip = String(data[r][nipColIdx]).trim();
       if (rowNip === String(nip).trim()) {
-        var existingDocJson = data[r][docColIdx];
-        var docObj = {};
-        if (existingDocJson) {
-          try {
-            docObj = typeof existingDocJson === 'object' ? existingDocJson : JSON.parse(existingDocJson);
-          } catch(e) {
-            docObj = {};
-          }
+        // Jika dokumen adalah foto profil, update langsung kolom foto
+        if (fotoColIdx > -1 && (jenisDokumen === 'FOTO_PROFIL' || jenisDokumen === 'FOTO')) {
+          pSheet.getRange(r + 1, fotoColIdx + 1).setValue(fileUrl);
         }
-        
-        // Simpan url dokumen sesuai kategori
-        var fieldKey = jenisDokumen.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        docObj[fieldKey] = {
-          url: fileUrl,
-          nama_file: fileName,
-          updated_at: new Date().toISOString()
-        };
-        docObj[fieldKey + '_url'] = fileUrl;
-        
-        pSheet.getRange(r + 1, docColIdx + 1).setValue(JSON.stringify(docObj));
+
+        if (docColIdx > -1) {
+          var existingDocJson = data[r][docColIdx];
+          var docObj = {};
+          if (existingDocJson) {
+            try {
+              docObj = typeof existingDocJson === 'object' ? existingDocJson : JSON.parse(existingDocJson);
+            } catch(e) {
+              docObj = {};
+            }
+          }
+          
+          // Simpan url dokumen sesuai kategori
+          var fieldKey = jenisDokumen.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+          docObj[fieldKey] = {
+            url: fileUrl,
+            nama_file: fileName,
+            updated_at: new Date().toISOString()
+          };
+          docObj[fieldKey + '_url'] = fileUrl;
+          
+          pSheet.getRange(r + 1, docColIdx + 1).setValue(JSON.stringify(docObj));
+        }
+
         if (updatedAtColIdx > -1) {
           pSheet.getRange(r + 1, updatedAtColIdx + 1).setValue(new Date());
         }

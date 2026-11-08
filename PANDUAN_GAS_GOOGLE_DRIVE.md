@@ -7,10 +7,10 @@ Panduan ini menjelaskan cara menghubungkan aplikasi SIMPEG Digital ke **Google S
 
 ## 🌟 Ringkasan Alur & Manfaat
 1. **Google Spreadsheet**: Berfungsi sebagai database penyimpanan data tabel (Pegawai, Pengguna, Usulan, Disiplin, Gap Kompetensi, Penggajian, Uraian Tugas).
-2. **Google Drive**: Berfungsi sebagai penyimpanan file digital tak terbatas. Seluruh berkas pegawai otomatis disimpan ke folder induk:
-   - **Link Folder Google Drive Utama**: [https://drive.google.com/drive/u/0/folders/1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR](https://drive.google.com/drive/u/0/folders/1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR)
-   - **ID Folder Google Drive**: `1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR`
-   - **Subfolder Pegawai**: Script otomatis membuat dan mengelompokkan berkas ke dalam sub-folder khusus sesuai dengan nama masing-masing pegawai.
+2. **Google Drive**: Berfungsi sebagai penyimpanan foto profil & berkas arsip digital. Seluruh foto dan dokumen pegawai otomatis disimpan ke folder induk:
+   - **Link Folder Google Drive Utama**: [https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P](https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)
+   - **ID Folder Google Drive**: `1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P`
+   - **Subfolder Pegawai**: Script otomatis membuat dan mengelompokkan berkas & foto ke dalam sub-folder khusus sesuai dengan nama masing-masing pegawai.
 3. **Google Apps Script (Code.gs)**: Menjadi jembatan REST API antara SIMPEG Digital dan ekosistem Google Workspace.
 
 ---
@@ -18,7 +18,7 @@ Panduan ini menjelaskan cara menghubungkan aplikasi SIMPEG Digital ke **Google S
 ## 🛠️ LANGKAH 1: MEMBUAT SPREADSHEET & FOLDER GOOGLE DRIVE
 
 1. **Folder Google Drive Induk**:
-   - Folder Google Drive induk telah dikonfigurasi ke: `https://drive.google.com/drive/u/0/folders/1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR` (`ID: 1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR`).
+   - Folder Google Drive induk telah dikonfigurasi ke: `https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P` (`ID: 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P`).
    - Di dalam folder ini, script `Code.gs` akan secara otomatis membuat subfolder berdasarkan nama masing-masing pegawai saat dokumen pertama kali diunggah.
 2. **Buat Google Spreadsheet Baru**:
    - Di dalam Google Drive Anda, klik **Baru (+)** ➔ **Google Spreadsheet** ➔ **Spreadsheet kosong**.
@@ -33,7 +33,7 @@ Panduan ini menjelaskan cara menghubungkan aplikasi SIMPEG Digital ke **Google S
 2. Jendela editor Google Apps Script akan terbuka di tab baru.
 3. Hapus seluruh teks kode bawaan (`function myFunction() { ... }`) di file `Code.gs`.
 4. Buka file **`Code.gs`** yang telah disediakan di aplikasi ini, lalu **Copy (Salin) seluruh isinya** dan **Paste (Tempel)** ke editor Apps Script.
-5. Konfigurasi ID Folder Drive (`1-5JR1hZ28DxCkaUc0ObP5VKVVS5YC-vR`) sudah terpasang secara default di `Code.gs`.
+5. Konfigurasi ID Folder Drive (`1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P`) sudah terpasang secara default di `Code.gs`.
 6. Klik ikon **Simpan (Save / 💾)** atau tekan `Ctrl + S`.
 
 ---

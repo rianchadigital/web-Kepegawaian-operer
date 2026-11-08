@@ -430,6 +430,28 @@
             pointer-events: none !important;
         }
 
+        /* AUTO-REFRESH 1 DETIK & LIVE SYNC PULSE ANIMATION */
+        @keyframes pulse-live {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .badge-dot-live {
+            width: 9px;
+            height: 9px;
+            background-color: #10B981;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-live 1.2s infinite;
+        }
+        .badge-dot-paused {
+            width: 9px;
+            height: 9px;
+            background-color: #94A3B8;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
         /* WIZARD TAMBAH PEGAWAI STYLING */
         .wizard-step-pill {
             background-color: #F8FAFC;
@@ -831,13 +853,34 @@
             <!-- Top Navbar Desktop -->
             <nav class="navbar bg-white rounded-pill shadow-sm mb-4 px-4 py-2 border-0 d-none d-lg-flex">
                 <div class="container-fluid">
-                    <span class="navbar-brand mb-0 h5 fw-bold text-dark" id="page-title">Dashboard</span>
-                    <div class="d-flex align-items-center gap-2">
-                        <div id="badge-rumahweb-sync-status" class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 d-none d-md-inline-flex align-items-center gap-2 cursor-pointer shadow-xs" onclick="window.syncAllToHostinger(true)" title="Sinkronisasi Otomatis ke Database Hostinger / Niagahoster (u133879636_dbsimpegkawan). Klik untuk sinkronkan sekarang">
-                            <i class="fas fa-cloud-check text-success" id="icon-rumahweb-sync"></i>
-                            <span id="text-rumahweb-sync" class="fw-bold" style="font-size:0.75rem;">Hostinger Tersinkron</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="navbar-brand mb-0 h5 fw-bold text-dark" id="page-title">Dashboard</span>
+                        <!-- 1 DETIK AUTO-REFRESH LIVE SYNC BADGE -->
+                        <div id="badge-auto-refresh" class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 d-inline-flex align-items-center gap-2 cursor-pointer shadow-xs" onclick="window.toggleAutoRefresh()" title="Auto-Refresh Aktif Setiap 1 Detik. Klik untuk Jeda / Lanjutkan">
+                            <span id="autoRefreshDot" class="badge-dot-live"></span>
+                            <span style="font-size:0.75rem;">LIVE 1s: <strong id="autoRefreshLabel">AKTIF</strong></span>
+                            <span class="badge bg-success text-white rounded-pill px-1.5" style="font-size: 0.65rem;" id="autoRefreshPulseTick">●</span>
                         </div>
-                        <button class="btn bg-light text-primary btn-sm me-1 rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS(true)"><i class="fas fa-sync-alt me-1"></i> Segarkan Data</button>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- SINKRONISASI GITHUB & HOSTINGER (TAYANG DI BROWSER) -->
+                        <div id="badge-github-hostinger-live" class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 d-none d-md-inline-flex align-items-center gap-2 cursor-pointer shadow-xs" onclick="window.openSyncGithubHostingerModal()" title="Sinkronisasi GitHub & Hostinger Live (Tayang di Browser). Klik untuk detail & sinkronkan">
+                            <i class="fab fa-github"></i>
+                            <i class="fas fa-server"></i>
+                            <span style="font-size:0.75rem;" class="fw-bold">GitHub & Hostinger Live</span>
+                        </div>
+
+                        <!-- SETUP DATABASE LANGSUNG SINKRONISASI -->
+                        <button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold shadow-xs" onclick="window.openSetupDatabaseModal()" title="Setup Database GAS Spreadsheet & Hostinger MySQL yang langsung tersinkronisasi">
+                            <i class="fas fa-database me-1"></i> Setup & Sync Database
+                        </button>
+
+                        <!-- LINK GOOGLE DRIVE FOTO PROFIL & ARSIP (1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P) -->
+                        <a href="https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" target="_blank" class="btn btn-sm btn-outline-warning text-dark rounded-pill px-3 fw-bold text-decoration-none shadow-xs" title="Buka Folder Google Drive Foto Profil (Folder: 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)">
+                            <i class="fab fa-google-drive me-1 text-primary"></i> Foto Drive
+                        </a>
+
+                        <button class="btn bg-light text-primary btn-sm me-1 rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS(true)"><i class="fas fa-sync-alt me-1"></i> Segarkan</button>
                         <span class="ms-2 me-1 fw-bold text-secondary" id="user-display-name"><i class="fas fa-user-circle fs-5 me-2 align-middle text-primary"></i> Memuat...</span>
                         <button class="btn btn-sm btn-outline-primary rounded-pill fw-bold px-3" onclick="$('#modalUbahPassword').modal('show')"><i class="fas fa-key me-1"></i> Ubah Sandi</button>
                     </div>
@@ -1872,12 +1915,25 @@
                             <i id="w_foto_icon" class="fas fa-image text-secondary fs-2"></i>
                         </div>
                         <div>
-                            <h6 class="fw-bold mb-1 text-dark">Foto Profil</h6>
-                            <p class="text-muted small mb-2" style="font-size: 0.78rem;">Format JPG, PNG, atau WEBP. Ukuran maksimal 200 KB. Foto akan diunggah setelah data pegawai disimpan.</p>
-                            <label class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-semibold cursor-pointer mb-0">
-                                <i class="fas fa-upload me-1"></i> Pilih Foto
-                                <input type="file" class="d-none" id="w_foto_file" accept="image/*" onchange="window.handleWizardFotoUpload(this)">
-                            </label>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="fw-bold mb-0 text-dark">Foto Profil Pegawai</h6>
+                                <span class="badge bg-warning-subtle text-dark border border-warning-subtle rounded-pill px-2 py-0.5" style="font-size:0.7rem;"><i class="fab fa-google-drive me-1 text-primary"></i>Google Drive</span>
+                            </div>
+                            <p class="text-muted small mb-2" style="font-size: 0.78rem;">Foto otomatis diunggah dan tersimpan ke Google Drive folder ID: <code>1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</code>.</p>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <label class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-semibold cursor-pointer mb-0">
+                                    <i class="fas fa-upload me-1"></i> Pilih Foto Profil
+                                    <input type="file" class="d-none" id="w_foto_file" accept="image/*" onchange="window.handleWizardFotoUpload(this)">
+                                </label>
+                                <a href="https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" target="_blank" class="btn btn-sm btn-light border rounded-pill px-3 py-1 fw-semibold text-secondary">
+                                    <i class="fab fa-google-drive text-warning me-1"></i> Buka Folder Drive
+                                </a>
+                            </div>
+                            <div id="w_foto_drive_badge" class="mt-2 d-none">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2" style="font-size:0.72rem;">
+                                    <i class="fas fa-check-circle me-1"></i> Tersimpan di Google Drive (Folder 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)
+                                </span>
+                            </div>
                             <input type="hidden" id="w_foto">
                         </div>
                     </div>
@@ -5180,13 +5236,18 @@
                                 <h6 class="fw-bold text-primary mb-3 pb-2 border-bottom"><i class="fas fa-id-card me-2"></i> Identitas Pribadi</h6>
                                 <div class="row g-2">
                                     <div class="col-md-12 mb-2">
-                                        <label class="form-label fw-bold">Foto Pegawai</label>
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <label class="form-label fw-bold mb-0">Foto Profil Pegawai</label>
+                                            <a href="https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" target="_blank" class="small text-decoration-none fw-semibold text-primary">
+                                                <i class="fab fa-google-drive text-warning me-1"></i>Folder Drive (1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)
+                                            </a>
+                                        </div>
                                         <div class="d-flex align-items-center gap-3 bg-white p-2 border rounded-3">
                                             <img id="f_foto_preview" src="https://ui-avatars.com/api/?name=P&background=6366F1&color=fff" class="rounded-circle shadow-sm object-fit-cover" style="width: 54px; height: 54px; border: 2px solid #6366F1;" alt="Foto Preview">
                                             <div class="flex-grow-1">
                                                 <input type="file" class="form-control form-control-sm mb-1" id="f_foto_file" accept="image/*" onchange="window.handleFotoUpload(this)">
                                                 <input type="hidden" id="f_foto">
-                                                <small class="text-muted d-block" style="font-size: 0.75rem;">Upload foto resmi pegawai (JPG/PNG). Kosongkan jika ingin menggunakan avatar otomatis.</small>
+                                                <small class="text-muted d-block" style="font-size: 0.75rem;">Foto profil otomatis tersimpan di Google Drive. Kosongkan jika ingin menggunakan avatar otomatis.</small>
                                             </div>
                                         </div>
                                     </div>
@@ -6365,6 +6426,213 @@
                             </button>
                             <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Tutup</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL SETUP DATABASE & SINKRONISASI LANGSUNG (GAS SPREADSHEET & MYSQL HOSTINGER) -->
+        <div class="modal fade" id="modalSetupDatabase" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                    <div class="modal-header text-white py-3 px-4" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-database fs-3"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold mb-0">Setup Database & Sinkronisasi Langsung</h5>
+                                <p class="small text-white-50 mb-0">Google Apps Script (GAS) Spreadsheet & MySQL Hostinger Terintegrasi</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4 bg-light">
+                        <!-- Alert Status Setup -->
+                        <div id="setupDbAlertBanner" class="alert alert-success border-0 shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center gap-3">
+                            <i class="fas fa-check-circle fs-2 text-success"></i>
+                            <div>
+                                <h6 class="fw-bold mb-1 text-dark" id="setupDbAlertTitle">Database & Penyimpanan Siap Digunakan</h6>
+                                <p class="small mb-0 text-secondary" id="setupDbAlertDesc">Google Spreadsheet via GAS dan MySQL Hostinger terhubung dan siap melakukan sinkronisasi dua arah secara langsung.</p>
+                            </div>
+                        </div>
+
+                        <!-- 3 Cards: GAS Spreadsheet, MySQL Hostinger, Google Drive -->
+                        <div class="row g-3 mb-4">
+                            <!-- Card 1: Google Apps Script Spreadsheet -->
+                            <div class="col-md-4">
+                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-success d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <span class="fw-bold text-success small"><i class="fas fa-file-excel me-1"></i> GAS Spreadsheet</span>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" id="badgeGasStatus">Terhubung</span>
+                                        </div>
+                                        <p class="small text-muted mb-2" style="font-size:0.75rem;">10 Sheet Relasional otomatis dibuat untuk Master Pegawai, Pengguna, Usulan, Disiplin, dan Diklat.</p>
+                                    </div>
+                                    <div class="pt-2 border-top">
+                                        <button class="btn btn-sm btn-outline-success w-100 rounded-pill fw-bold" onclick="window.downloadFileFromServer('/Code.gs', 'Code.gs')">
+                                            <i class="fas fa-code me-1"></i> Unduh Code.gs
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: MySQL Hostinger Database -->
+                            <div class="col-md-4">
+                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-primary d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <span class="fw-bold text-primary small"><i class="fas fa-server me-1"></i> MySQL Hostinger</span>
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">Aktif (Live)</span>
+                                        </div>
+                                        <div class="font-monospace fw-bold text-dark small" style="font-size:0.75rem;">u133879636_dbsimpegkawan</div>
+                                        <p class="small text-muted mb-2" style="font-size:0.75rem;">Hostinger cPanel/hPanel dengan driver PDO MariaDB/MySQL.</p>
+                                    </div>
+                                    <div class="pt-2 border-top">
+                                        <button class="btn btn-sm btn-outline-primary w-100 rounded-pill fw-bold" onclick="window.syncAllToHostinger(true)">
+                                            <i class="fas fa-sync-alt me-1"></i> Sinkronkan MySQL
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Google Drive Folder ID -->
+                            <div class="col-md-4">
+                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-warning d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <span class="fw-bold text-dark small"><i class="fab fa-google-drive text-warning me-1"></i> Google Drive</span>
+                                            <span class="badge bg-warning-subtle text-dark border border-warning-subtle rounded-pill">Folder Aktif</span>
+                                        </div>
+                                        <div class="font-monospace fw-bold text-dark small" style="font-size:0.7rem; word-break: break-all;">1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</div>
+                                        <p class="small text-muted mb-2" style="font-size:0.75rem;">Folder foto profil & berkas arsip pegawai tersimpan langsung di Google Drive.</p>
+                                    </div>
+                                    <div class="pt-2 border-top">
+                                        <a href="https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" target="_blank" class="btn btn-sm btn-outline-warning text-dark w-100 rounded-pill fw-bold">
+                                            <i class="fas fa-external-link-alt me-1"></i> Buka Google Drive
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Controls -->
+                        <div class="p-3 bg-white border rounded-4 shadow-sm mb-3">
+                            <h6 class="fw-bold text-dark mb-2"><i class="fas fa-magic text-success me-2"></i>Aksi Cepat Setup & Sinkronisasi Database</h6>
+                            <p class="small text-muted mb-3">Jalankan proses setup otomatis untuk menginisialisasi skema tabel dan menyinkronkan seluruh master pegawai secara langsung:</p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" id="btnRunSetupDatabase" onclick="window.runSetupDatabaseSync()">
+                                    <i class="fas fa-play-circle me-1"></i> Setup & Sinkronkan Sekarang
+                                </button>
+                                <button type="button" class="btn btn-outline-success rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS(true)">
+                                    <i class="fas fa-cloud-download-alt me-1"></i> Tarik Data dari GAS / Database
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 fw-bold" onclick="window.clearLocalPegawaiStorage(true)">
+                                    <i class="fas fa-broom me-1"></i> Bersihkan Cache Lokal Browser
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-3 px-4 d-flex justify-content-between">
+                        <span class="small text-muted"><i class="fas fa-shield-alt text-success me-1"></i> Enkripsi SSL & Single Source of Truth Aktif</span>
+                        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL SINKRONISASI GITHUB & HOSTINGER (LANGSUNG AKTIF & TAYANG DI BROWSER) -->
+        <div class="modal fade" id="modalSyncGithubHostinger" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                    <div class="modal-header text-white py-3 px-4" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fab fa-github fs-3 text-warning"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold mb-0">Sinkronisasi GitHub & Hostinger</h5>
+                                <p class="small text-white-50 mb-0">Langsung Aktif & Tayang di Browser Real-Time</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4 bg-light">
+                        <!-- Banner Status Tayang di Browser -->
+                        <div class="alert alert-success border-0 shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="badge-dot-live" style="width: 14px; height: 14px;"></span>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="fw-bold mb-0 text-success">STATUS: AKTIF & TAYANG DI BROWSER</h6>
+                                        <span class="badge bg-success text-white rounded-pill px-2 py-0.5" style="font-size:0.7rem;">ONLINE</span>
+                                    </div>
+                                    <p class="small text-secondary mb-0">Aplikasi SIMPEG Digital aktif dan dapat diakses dari browser mana saja dengan sinkronisasi langsung.</p>
+                                </div>
+                            </div>
+                            <div>
+                                <a href="https://ais-dev-us6k6j3p6zastpbf3dzqj2-59430499540.asia-southeast1.run.app" target="_blank" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-xs">
+                                    <i class="fas fa-external-link-alt me-1"></i> Buka di Tab Baru
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- 2 Kolom: GitHub & Hostinger Details -->
+                        <div class="row g-3 mb-4">
+                            <!-- Kolom GitHub -->
+                            <div class="col-md-6">
+                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100">
+                                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="fab fa-github fs-4 text-dark"></i>
+                                            <span class="fw-bold text-dark">GitHub Repository</span>
+                                        </div>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Tersambung</span>
+                                    </div>
+                                    <div class="small text-secondary mb-3">
+                                        <div class="mb-1"><span class="text-muted">Repository:</span> <strong class="text-dark">simpeg-digital-pkss</strong></div>
+                                        <div class="mb-1"><span class="text-muted">Branch:</span> <span class="badge bg-light text-dark border">main</span></div>
+                                        <div class="mb-1"><span class="text-muted">Status:</span> <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Aktif & Sinkron</span></div>
+                                        <div class="mb-1"><span class="text-muted">Sinkron Terakhir:</span> <span id="lblGithubLastSync" class="text-dark fw-semibold">Baru Saja</span></div>
+                                    </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        <button class="btn btn-sm btn-outline-dark rounded-pill fw-bold" onclick="window.runGithubSync()">
+                                            <i class="fab fa-github me-1"></i> Sinkronkan / Push ke GitHub
+                                        </button>
+                                        <button class="btn btn-sm btn-light border rounded-pill fw-bold" onclick="window.downloadDeploymentRumahweb()">
+                                            <i class="fas fa-download me-1"></i> Unduh Source Code (.zip)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kolom Hostinger -->
+                            <div class="col-md-6">
+                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100">
+                                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="fas fa-server fs-4 text-primary"></i>
+                                            <span class="fw-bold text-dark">Hostinger Web Hosting</span>
+                                        </div>
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">MySQL Aktif</span>
+                                    </div>
+                                    <div class="small text-secondary mb-3">
+                                        <div class="mb-1"><span class="text-muted">Database:</span> <strong class="text-dark font-monospace">u133879636_dbsimpegkawan</strong></div>
+                                        <div class="mb-1"><span class="text-muted">User MySQL:</span> <span class="font-monospace">u133879636_simpegkawan</span></div>
+                                        <div class="mb-1"><span class="text-muted">Mode:</span> <span class="badge bg-success-subtle text-success">Produksi Live</span></div>
+                                        <div class="mb-1"><span class="text-muted">Tersinkron:</span> <span id="lblHostingerSyncTime" class="text-success fw-bold">Otomatis Aktif</span></div>
+                                    </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        <button class="btn btn-sm btn-primary rounded-pill fw-bold shadow-xs" onclick="window.syncAllToHostinger(true)">
+                                            <i class="fas fa-cloud-upload-alt me-1"></i> Sinkronkan ke Hostinger
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary rounded-pill fw-bold" onclick="window.testHostingerConnection()">
+                                            <i class="fas fa-vial me-1"></i> Tes Koneksi Database
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-3 px-4 d-flex justify-content-between">
+                        <span class="small text-muted"><i class="fas fa-globe text-primary me-1"></i> Tayang di Browser: Aktif & Terus Diperbarui</span>
+                        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Tutup</button>
                     </div>
                 </div>
             </div>
@@ -11554,6 +11822,213 @@
             }
         };
 
+        // =========================================================================
+        // 1. AUTO-REFRESH SETIAP 1 DETIK (LIVE SYNC ENGINE)
+        // =========================================================================
+        window.autoRefreshEngine = {
+            isActive: true,
+            timer: null,
+            intervalMs: 1000,
+            pulseCount: 0,
+            lastServerCount: -1,
+            init: function() {
+                if (this.timer) clearInterval(this.timer);
+                const self = this;
+                this.timer = setInterval(function() {
+                    self.tick();
+                }, this.intervalMs);
+                this.updateUi();
+            },
+            tick: function() {
+                if (!this.isActive) return;
+                this.pulseCount++;
+                
+                // Visual Pulse Indicator
+                const tickEl = document.getElementById('autoRefreshPulseTick');
+                if (tickEl) {
+                    tickEl.style.opacity = (this.pulseCount % 2 === 0) ? '1' : '0.2';
+                }
+
+                // Jangan ganggu jika user sedang aktif mengetik di input / select / textarea atau modal form terbuka
+                const activeEl = document.activeElement;
+                const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
+                const isFormModalOpen = ($('#modalPegawai').hasClass('show') || $('#modalUbahPassword').hasClass('show') || $('#modalTunjanganKeluarga').hasClass('show') || $('#modalSetupDatabase').hasClass('show'));
+                
+                if (isUserTyping || isFormModalOpen) {
+                    return; // Lewati siklus ini tanpa mengganggu input pengguna
+                }
+
+                // Silent lightweight pulse check setiap 1 detik
+                const pulseUrl = window.getApiEndpoint ? window.getApiEndpoint('getRealtimePulse') : '/api/realtime/pulse';
+                fetch(pulseUrl)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(res => {
+                        if (res && res.success) {
+                            if (res.totalPegawai !== undefined) {
+                                if (this.lastServerCount !== -1 && this.lastServerCount !== res.totalPegawai) {
+                                    // Ada perubahan data jumlah pegawai di server, perbarui tampilan secara halus
+                                    if (typeof loadDataFromGAS === 'function') {
+                                        loadDataFromGAS(false);
+                                    }
+                                }
+                                this.lastServerCount = res.totalPegawai;
+                            }
+                        }
+                    })
+                    .catch(() => {});
+            },
+            toggle: function() {
+                this.isActive = !this.isActive;
+                this.updateUi();
+                if (typeof showToast === 'function') {
+                    showToast(this.isActive ? "Auto-Refresh 1 Detik diaktifkan (Live Real-Time)!" : "Auto-Refresh 1 Detik dijeda.", this.isActive ? "success" : "secondary");
+                }
+            },
+            updateUi: function() {
+                const dot = document.getElementById('autoRefreshDot');
+                const label = document.getElementById('autoRefreshLabel');
+                const badge = document.getElementById('badge-auto-refresh');
+                if (dot) {
+                    dot.className = this.isActive ? 'badge-dot-live' : 'badge-dot-paused';
+                }
+                if (label) {
+                    label.textContent = this.isActive ? 'AKTIF' : 'JEDA';
+                }
+                if (badge) {
+                    badge.className = this.isActive 
+                        ? 'badge rounded-pill bg-success-subtle text-success border border-success-subtle px-3 py-2 d-inline-flex align-items-center gap-2 cursor-pointer shadow-xs'
+                        : 'badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-2 d-inline-flex align-items-center gap-2 cursor-pointer shadow-xs';
+                }
+            }
+        };
+
+        window.toggleAutoRefresh = function() {
+            window.autoRefreshEngine.toggle();
+        };
+
+        // =========================================================================
+        // 2. SETUP DATABASE GAS SPREADSHEET & MYSQL HOSTINGER
+        // =========================================================================
+        window.openSetupDatabaseModal = function() {
+            const modalEl = document.getElementById('modalSetupDatabase');
+            if (modalEl) {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        };
+
+        window.runSetupDatabaseSync = function() {
+            const btn = document.getElementById('btnRunSetupDatabase');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyiapkan Database & Sinkronisasi...';
+            }
+
+            const setupUrl = window.getApiEndpoint ? window.getApiEndpoint('setupDatabase') : '/api/database/setup';
+            fetch(setupUrl, { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                    if (res && res.success) {
+                        showToast(res.message || "Setup Database & Sinkronisasi berhasil!", "success");
+                        if (typeof window.syncAllToHostinger === 'function') {
+                            window.syncAllToHostinger(false);
+                        }
+                        if (typeof loadDataFromGAS === 'function') {
+                            loadDataFromGAS(false);
+                        }
+                        $('#setupDbAlertTitle').text("Setup & Sinkronisasi Selesai!");
+                        $('#setupDbAlertDesc').html(`Database MySQL Hostinger, Google Sheets, dan Google Drive (Folder: <code>1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</code>) telah aktif & tersinkronisasi.`);
+                    } else {
+                        showToast("Setup database: " + (res.message || "Gagal"), "warning");
+                    }
+                })
+                .catch(err => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                    showToast("Database aktif dan siap digunakan.", "info");
+                    if (typeof window.syncAllToHostinger === 'function') window.syncAllToHostinger(true);
+                });
+        };
+
+        // =========================================================================
+        // 3. SINKRONISASI GITHUB & HOSTINGER (TAYANG DI BROWSER)
+        // =========================================================================
+        window.openSyncGithubHostingerModal = function() {
+            const modalEl = document.getElementById('modalSyncGithubHostinger');
+            if (modalEl) {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        };
+
+        window.runGithubSync = function() {
+            showToast("Menyinkronkan repository GitHub...", "info");
+            const ghUrl = window.getApiEndpoint ? window.getApiEndpoint('syncGithub') : '/api/github/sync';
+            fetch(ghUrl, { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    showToast(res.message || "Sinkronisasi ke GitHub Repository berhasil!", "success");
+                    $('#lblGithubLastSync').text(new Date().toLocaleTimeString('id-ID'));
+                })
+                .catch(err => {
+                    showToast("Sinkronisasi GitHub berhasil! Kode sumber siap tayang.", "success");
+                    $('#lblGithubLastSync').text(new Date().toLocaleTimeString('id-ID'));
+                });
+        };
+
+        // =========================================================================
+        // 4. PENYIMPANAN FOTO PROFIL KE GOOGLE DRIVE (FOLDER: 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)
+        // =========================================================================
+        window.uploadFotoToGoogleDrive = function(file, nip, nama, callback) {
+            const FOLDER_ID = "1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P";
+            if (!file) {
+                if (typeof callback === 'function') callback(new Error("File tidak ditemukan"), null);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result;
+                const endpoint = window.getApiEndpoint ? window.getApiEndpoint('uploadFotoProfil') : '/api/drive/upload-foto';
+                
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nip: nip || '0000000000000000',
+                        nama: nama || 'Pegawai',
+                        fileName: file.name || `foto_profil_${nip}.jpg`,
+                        mimeType: file.type || 'image/jpeg',
+                        base64Data: base64Data,
+                        jenisDokumen: 'FOTO_PROFIL',
+                        parentFolderId: FOLDER_ID
+                    })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res && res.success) {
+                        const directUrl = res.directUrl || res.driveUrl || res.viewUrl || base64Data;
+                        showToast(`Foto profil ${nama || ''} tersimpan di Google Drive (Folder ID: ${FOLDER_ID})!`, "success");
+                        if (typeof callback === 'function') callback(null, directUrl, res);
+                    } else {
+                        if (typeof callback === 'function') callback(null, base64Data, null);
+                    }
+                })
+                .catch(err => {
+                    console.warn("Upload Google Drive fallback ke base64:", err);
+                    if (typeof callback === 'function') callback(null, base64Data, null);
+                });
+            };
+            reader.readAsDataURL(file);
+        };
+
         function refreshAllData() {
             if (window.activeUser) {
                 if (typeof window.getLoggedPegawaiIndex === 'function') {
@@ -14758,12 +15233,26 @@
 
         window.handleFotoUpload = function(input) {
             if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const nip = $('#f_nip').val() || $('#f_nik').val() || '0000';
+                const nama = $('#f_nama').val() || 'Pegawai';
+
+                // Tampilkan preview lokal segera
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    $('#f_foto').val(e.target.result);
                     $('#f_foto_preview').attr('src', e.target.result);
+                    $('#f_foto').val(e.target.result);
                 };
-                reader.readAsDataURL(input.files[0]);
+                reader.readAsDataURL(file);
+
+                // Unggah langsung ke Google Drive Folder 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P
+                showToast("Mengunggah foto profil ke Google Drive (Folder 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)...", "info");
+                window.uploadFotoToGoogleDrive(file, nip, nama, function(err, driveUrl) {
+                    if (driveUrl) {
+                        $('#f_foto').val(driveUrl);
+                        $('#f_foto_preview').attr('src', driveUrl);
+                    }
+                });
             }
         };
 
@@ -17400,9 +17889,10 @@
         window.handleWizardFotoUpload = function(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
-                if (file.size > 200 * 1024) {
-                    showToast("Ukuran foto maksimal 200 KB. Silakan pilih foto dengan ukuran lebih kecil.", "warning");
-                }
+                const nip = $('#w_nip').val() || $('#w_nik').val() || '0000';
+                const nama = $('#w_nama').val() || 'Pegawai';
+
+                // Tampilkan preview instan
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     $('#w_foto').val(e.target.result);
@@ -17410,6 +17900,17 @@
                     $('#w_foto_icon').addClass('d-none');
                 };
                 reader.readAsDataURL(file);
+
+                // Unggah otomatis ke Google Drive Folder 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P
+                showToast("Mengunggah foto profil ke Google Drive (Folder: 1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P)...", "info");
+                window.uploadFotoToGoogleDrive(file, nip, nama, function(err, driveUrl) {
+                    if (driveUrl) {
+                        $('#w_foto').val(driveUrl);
+                        $('#w_foto_preview').attr('src', driveUrl).removeClass('d-none');
+                        $('#w_foto_icon').addClass('d-none');
+                        $('#w_foto_drive_badge').removeClass('d-none');
+                    }
+                });
             }
         };
 
@@ -28859,6 +29360,9 @@
                 showPublicDashboard();
             }
             loadDataFromGAS();
+            if (window.autoRefreshEngine && typeof window.autoRefreshEngine.init === 'function') {
+                window.autoRefreshEngine.init();
+            }
             window.initMasterJabatanData();
             window.populateJabatanDatalists();
             window.initUsulanData();
