@@ -103,8 +103,57 @@ function getPegawaiFolder(nip, nama) {
 }
 
 // ==============================================================================
-// 3. INISIALISASI STRUKTUR SHEET & DATA AWAL (SETUP DATABASE)
+// 3. MENU SPREADSHEET & SETUP DATABASE (BUAT TABEL-TABEL OTOMATIS)
 // ==============================================================================
+/**
+ * Menu Kustom Otomatis saat Google Spreadsheet dibuka.
+ * Memungkinkan pengguna membuat tabel-tabel langsung dari antarmuka Spreadsheet!
+ */
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('🚀 SIMPEG PKSS')
+      .addItem('⚙️ Jalankan Setup Database (Buat Semua Tabel & Format)', 'setupDatabase')
+      .addItem('🎨 Format & Rapikan Header Seluruh Sheet', 'formatSheetHeaders')
+      .addItem('📂 Periksa Folder Google Drive', 'checkDriveFolderStatus')
+      .addSeparator()
+      .addItem('ℹ️ Status Database & Info Sistem', 'showAboutDialog')
+      .addToUi();
+  } catch (e) {
+    Logger.log("onOpen UI Menu tidak dapat diinisialisasi (misal di Web App context): " + e.message);
+  }
+}
+
+function showAboutDialog() {
+  var ui = SpreadsheetApp.getUi();
+  ui.alert(
+    'Database SIMPEG Digital PKSS (Google Apps Script)',
+    'Database Google Spreadsheet & Google Drive Storage terhubung secara real-time ke aplikasi website SIMPEG PKSS.\n\n' +
+    'Folder Google Drive ID: ' + GOOGLE_DRIVE_FOLDER_ID + '\n' +
+    'Status: SINGLE SOURCE OF TRUTH (Database Global Semua Browser)\n\n' +
+    'Tabel Aktif: Pegawai, Pengguna, Usulan, Disiplin, GapKompetensi, UraianTugas, Penggajian, Diklat, Dokumen, Pengaturan.',
+    ui.ButtonSet.OK
+  );
+}
+
+function checkDriveFolderStatus() {
+  try {
+    var folder = getRootDriveFolder();
+    var ui = SpreadsheetApp.getUi();
+    ui.alert(
+      'Status Google Drive: TERHUBUNG',
+      'Nama Folder: ' + folder.getName() + '\n' +
+      'ID Folder: ' + folder.getId() + '\n' +
+      'URL: ' + folder.getUrl() + '\n' +
+      'Folder ini digunakan untuk menyimpan seluruh Foto Profil & Dokumen Pegawai.',
+      ui.ButtonSet.OK
+    );
+  } catch(e) {
+    var ui = SpreadsheetApp.getUi();
+    ui.alert('Peringatan Folder Drive', 'Folder ID belum dapat diakses: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
 var SHEET_CONFIG = {
   'Pegawai': [
     'rowIndex', 'nik', 'nip', 'nrk', 'nama', 'gelar_depan', 'gelar_belakang',
@@ -147,9 +196,46 @@ var SHEET_CONFIG = {
   ]
 };
 
+/**
+ * Fungsi Utama: Setup Database di Code GS.
+ * Membuat tabel-tabel database jika belum ada, memformat header, dan menginisialisasi data awal.
+ * Dapat dipanggil dari Editor Google Script, Menu Spreadsheet, atau HTTP Web App API.
+ */
+function setupDatabase() {
+  return initDatabaseSheets();
+}
+
+function formatSheetHeader(sheet, numCols) {
+  if (!sheet || numCols <= 0) return;
+  var headerRange = sheet.getRange(1, 1, 1, numCols);
+  headerRange
+    .setFontWeight("bold")
+    .setBackground("#0f766e") // Warna Modern Teal Elegan
+    .setFontColor("#ffffff")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setWrap(false);
+  sheet.setFrozenRows(1);
+  try {
+    sheet.setRowHeight(1, 35);
+  } catch(e) {}
+}
+
+function formatSheetHeaders() {
+  var ss = getSpreadsheet();
+  for (var sheetName in SHEET_CONFIG) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet && sheet.getLastColumn() > 0) {
+      formatSheetHeader(sheet, sheet.getLastColumn());
+    }
+  }
+  return { success: true, message: "Header seluruh tabel database berhasil dirapikan!" };
+}
+
 function initDatabaseSheets() {
   var ss = getSpreadsheet();
   var created = [];
+  var existing = [];
   
   for (var sheetName in SHEET_CONFIG) {
     var sheet = ss.getSheetByName(sheetName);
@@ -158,21 +244,23 @@ function initDatabaseSheets() {
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#0284c7").setFontColor("#ffffff");
-      sheet.setFrozenRows(1);
+      formatSheetHeader(sheet, headers.length);
       created.push(sheetName);
     } else {
       // Periksa header baris pertama
       var lastCol = sheet.getLastColumn();
       if (lastCol === 0) {
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-        sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#0284c7").setFontColor("#ffffff");
-        sheet.setFrozenRows(1);
+        formatSheetHeader(sheet, headers.length);
+        created.push(sheetName);
+      } else {
+        formatSheetHeader(sheet, Math.min(lastCol, headers.length));
+        existing.push(sheetName);
       }
     }
   }
   
-  // Masukkan data default Pengguna jika kosong
+  // 1. Inisialisasi Data Default Pengguna jika tabel kosong
   var sheetPengguna = ss.getSheetByName('Pengguna');
   if (sheetPengguna && sheetPengguna.getLastRow() <= 1) {
     var defaultUsers = [
@@ -183,7 +271,7 @@ function initDatabaseSheets() {
     sheetPengguna.getRange(2, 1, defaultUsers.length, defaultUsers[0].length).setValues(defaultUsers);
   }
   
-  // Masukkan pengaturan default sistem jika kosong
+  // 2. Inisialisasi Pengaturan Sistem jika tabel kosong
   var sheetPengaturan = ss.getSheetByName('Pengaturan');
   if (sheetPengaturan && sheetPengaturan.getLastRow() <= 1) {
     var defaultSettings = [
@@ -193,12 +281,51 @@ function initDatabaseSheets() {
       ['email_puskesmas', 'pkmkepseribuselatan@jakarta.go.id', new Date()],
       ['telepon_puskesmas', '021-69876543', new Date()],
       ['kepala_puskesmas_nama', 'dr. Fitriani Handayani', new Date()],
-      ['kepala_puskesmas_nip', '198204202008012005', new Date()]
+      ['kepala_puskesmas_nip', '198204202008012005', new Date()],
+      ['google_drive_folder_id', GOOGLE_DRIVE_FOLDER_ID, new Date()],
+      ['database_source', 'GAS_SPREADSHEET_GLOBAL', new Date()]
     ];
     sheetPengaturan.getRange(2, 1, defaultSettings.length, defaultSettings[0].length).setValues(defaultSettings);
   }
+
+  // 3. Inisialisasi Sampel Pegawai jika sheet Pegawai masih kosong
+  var sheetPegawai = ss.getSheetByName('Pegawai');
+  if (sheetPegawai && sheetPegawai.getLastRow() <= 1) {
+    var samplePegawai = [
+      [
+        1, '3171012004820001', '198204202008012005', '182042', 'dr. Fitriani Handayani', 'dr.', '',
+        'Perempuan', 'Jakarta', '1982-04-20', 'Islam', 'Kawin',
+        'PNS', 'Puskesmas Kepulauan Seribu Selatan', 'Kepala Puskesmas', 'Kepala Puskesmas', 'Dokter Ahli Madya',
+        '01. Medis', 'Kedokteran Umum', 'Tenaga Medis', 'IV/a (Pembina)', '2020-04-01', 'Aktif',
+        '31.2.1.100.3.18.123456', '2028-04-20', '446/001/SIP-D/2020', '2028-04-20', '081234567890', 'dr.fitriani@jakarta.go.id', 'Jl. Pulau Tidung No. 10',
+        '[]', '[]', '[]', '[]', '[]', '{}', '[]', '', new Date()
+      ],
+      [
+        2, '3171011508850002', '198508152010011012', '185081', 'Budi Santoso, S.Kep., Ners', '', 'S.Kep., Ners',
+        'Laki-laki', 'Cirebon', '1985-08-15', 'Islam', 'Kawin',
+        'PNS', 'Puskesmas Kepulauan Seribu Selatan', 'Kasubbag Tata Usaha', 'Kasubbag TU', 'Perawat Ahli Muda',
+        '02. Keperawatan', 'Keperawatan Manajerial', 'Tenaga Kesehatan', 'III/d (Penata Tk. I)', '2019-10-01', 'Aktif',
+        '31.1.1.200.2.19.234567', '2026-08-15', '446/012/SIP-N/2019', '2026-08-15', '081398765432', 'budi.santoso@jakarta.go.id', 'Jl. Jembatan Cinta No. 05',
+        '[]', '[]', '[]', '[]', '[]', '{}', '[]', '', new Date()
+      ]
+    ];
+    sheetPegawai.getRange(2, 1, samplePegawai.length, samplePegawai[0].length).setValues(samplePegawai);
+  }
   
-  return { success: true, createdSheets: created, message: "Database SIMPEG di Google Spreadsheet berhasil diinisialisasi." };
+  var result = {
+    success: true,
+    message: "Setup Database Berhasil! Seluruh tabel Google Sheets telah dibuat, diformat, dan siap dijadikan Database Global.",
+    createdSheets: created,
+    existingSheets: existing,
+    totalSheets: Object.keys(SHEET_CONFIG).length,
+    spreadsheetName: ss.getName(),
+    spreadsheetId: ss.getId(),
+    driveFolderId: GOOGLE_DRIVE_FOLDER_ID,
+    timestamp: new Date().toISOString()
+  };
+  
+  Logger.log(JSON.stringify(result));
+  return result;
 }
 
 // ==============================================================================
@@ -227,8 +354,11 @@ function doGet(e) {
         };
         break;
         
+      case 'setupDatabase':
+      case 'setup_database':
       case 'initDatabase':
-        responseData = initDatabaseSheets();
+      case 'createTables':
+        responseData = setupDatabase();
         break;
         
       case 'getPegawaiData':
@@ -314,6 +444,16 @@ function doPost(e) {
     var result = {};
     
     switch (action) {
+      // -------------------------------------------------------------
+      // SETUP DATABASE (BUAT TABEL-TABEL OTOMATIS DI CODE GS)
+      // -------------------------------------------------------------
+      case 'setupDatabase':
+      case 'setup_database':
+      case 'initDatabase':
+      case 'createTables':
+        result = setupDatabase();
+        break;
+
       // -------------------------------------------------------------
       // UPLOAD DOKUMEN & FOTO PROFIL KE GOOGLE DRIVE
       // -------------------------------------------------------------

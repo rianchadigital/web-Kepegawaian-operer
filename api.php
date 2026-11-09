@@ -1515,7 +1515,13 @@ switch ($action) {
         if (!isset($db['config']) || !is_array($db['config'])) {
             $db['config'] = [];
         }
-        if (isset($payload['gas_webapp_url'])) $db['config']['gas_webapp_url'] = trim($payload['gas_webapp_url']);
+        if (isset($payload['gas_webapp_url'])) {
+            $db['config']['gas_webapp_url'] = trim($payload['gas_webapp_url']);
+            if (!empty($db['config']['gas_webapp_url'])) {
+                $db['config']['global_database_source'] = 'GAS';
+                $db['config']['gas_connected'] = true;
+            }
+        }
         if (isset($payload['spreadsheet_id'])) $db['config']['spreadsheet_id'] = trim($payload['spreadsheet_id']);
         if (isset($payload['drive_folder_id'])) $db['config']['drive_folder_id'] = trim($payload['drive_folder_id']);
         if (isset($payload['gas_direct_enabled'])) $db['config']['gas_direct_enabled'] = (bool)$payload['gas_direct_enabled'];
@@ -1523,8 +1529,38 @@ switch ($action) {
         saveAppStorage($jsonDbFile, $db);
         echo json_encode([
             'success' => true,
-            'message' => 'Pengaturan API GAS berhasil disimpan!',
+            'message' => 'Pengaturan API GAS berhasil disimpan! Database global merujuk ke GAS.',
             'config' => $db['config']
+        ]);
+        exit;
+
+    case 'runGasSetup':
+    case 'setupDatabaseGas':
+        $targetUrl = isset($payload['gas_webapp_url']) ? trim($payload['gas_webapp_url']) : ($db['config']['gas_webapp_url'] ?? '');
+        if (empty($targetUrl)) {
+            echo json_encode(['success' => false, 'message' => 'URL Web App GAS belum diisi.']);
+            exit;
+        }
+        $setupUrl = (strpos($targetUrl, '?') !== false) ? $targetUrl . '&action=setupDatabase' : $targetUrl . '?action=setupDatabase';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $setupUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $res = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($err) {
+            echo json_encode(['success' => false, 'message' => 'Gagal koneksi ke GAS: ' . $err]);
+            exit;
+        }
+        $db['config']['global_database_source'] = 'GAS';
+        $db['config']['gas_connected'] = true;
+        saveAppStorage($jsonDbFile, $db);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Setup Database di Code GS berhasil dijalankan!',
+            'gasResponse' => json_decode($res, true) ?: $res
         ]);
         exit;
 

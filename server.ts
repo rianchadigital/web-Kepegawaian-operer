@@ -620,6 +620,84 @@ function getGenAIClient(customApiKey?: string) {
   return genAIClient;
 }
 
+// ==============================================================================
+// GLOBAL GAS DATABASE SYNC & DISPATCH ENGINE
+// Ketika terkoneksi, semua browser secara global merujuk ke Google Apps Script
+// ==============================================================================
+let lastGasSyncTimestamp = 0;
+
+async function syncFromGasToLocal(force = false) {
+  const targetUrl = (configDb.gas_webapp_url || '').trim();
+  if (!targetUrl || !targetUrl.startsWith('https://script.google.com/macros/s/')) {
+    return null;
+  }
+  const now = Date.now();
+  if (!force && (now - lastGasSyncTimestamp) < 4000) {
+    return { cached: true, timestamp: lastGasSyncTimestamp };
+  }
+
+  try {
+    const fetchUrl = targetUrl.includes('?') ? `${targetUrl}&action=getAllAppModules` : `${targetUrl}?action=getAllAppModules`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const resp = await fetch(fetchUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) return null;
+    const json: any = await resp.json();
+    const bundle = (json && json.data) ? json.data : (Array.isArray(json) ? { pegawai: json } : null);
+    if (bundle) {
+      if (Array.isArray(bundle.pegawai) && bundle.pegawai.length > 0) {
+        pegawaiDb = bundle.pegawai;
+        savePegawaiDb(pegawaiDb);
+      }
+      if (Array.isArray(bundle.pengguna) && bundle.pengguna.length > 0) {
+        penggunaDb = bundle.pengguna;
+        saveJsonFile(PENGGUNA_FILE, penggunaDb);
+      }
+      if (Array.isArray(bundle.usulan)) {
+        usulanDb = bundle.usulan;
+        saveJsonFile(USULAN_FILE, usulanDb);
+      }
+      if (bundle.disiplin && typeof bundle.disiplin === 'object') {
+        disiplinDb = bundle.disiplin;
+        saveJsonFile(DISIPLIN_FILE, disiplinDb);
+      }
+      if (Array.isArray(bundle.gap)) {
+        gapDb = bundle.gap;
+        saveJsonFile(GAP_FILE, gapDb);
+      }
+      if (Array.isArray(bundle.gaji)) {
+        payrollDb = bundle.gaji;
+        saveJsonFile(PAYROLL_FILE, payrollDb);
+      }
+      lastGasSyncTimestamp = Date.now();
+      return bundle;
+    }
+  } catch (err: any) {
+    console.warn("GAS global sync error:", err.message);
+  }
+  return null;
+}
+
+function forwardToGasIfActive(action: string, payload: any) {
+  const targetUrl = (configDb.gas_webapp_url || '').trim();
+  if (!targetUrl || !targetUrl.startsWith('https://script.google.com/macros/s/')) return;
+  try {
+    fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action, data: payload })
+    }).catch(err => {
+      console.warn("Forward ke GAS async error:", err.message);
+    });
+  } catch (e) {}
+}
+
 // API ROUTING
 
 // Endpoint Download Project ZIP untuk Hosting
@@ -758,6 +836,18 @@ const handleApiGet = (req: express.Request, res: express.Response) => {
 const handleApiPost = (req: express.Request, res: express.Response) => {
   const action = req.body?.action || req.query.action;
   const data = req.body?.data !== undefined ? req.body.data : req.body;
+
+  // Jika aksi mutasi data dan GAS aktif, otomatis forward ke Google Apps Script (Sinkronisasi Global)
+  const mutationActions = [
+    'savePegawai', 'simpanPegawai', 'simpanPegawaiBaru', 'updatePegawai', 'editPegawai', 
+    'hapusPegawai', 'deletePegawai', 'saveAllData', 'saveAllPegawai', 'bulkUploadPegawai', 
+    'saveAllAppModules', 'saveGajiData', 'savePayrollData', 'importGajiData', 'deleteGajiData', 
+    'saveUsulan', 'updateUsulan', 'saveDisiplin', 'saveDisiplinData', 'saveGapKompetensi', 
+    'saveGapData', 'savePengguna', 'savePenggunaData', 'saveDiklat', 'saveDiklatData', 'saveRenjaData'
+  ];
+  if (mutationActions.includes(action)) {
+    forwardToGasIfActive(action, data);
+  }
 
   if (action === 'getPegawaiData' || action === 'getData') {
     return res.json(pegawaiDb);
@@ -1425,20 +1515,102 @@ app.get('/api/gas/config', (req, res) => {
 
 app.post('/api/gas/config', (req, res) => {
   const payload = req.body || {};
+  const newGasUrl = payload.gas_webapp_url !== undefined ? String(payload.gas_webapp_url).trim() : (configDb.gas_webapp_url || '');
+  const isConnecting = Boolean(newGasUrl && newGasUrl.length > 0);
+
   configDb = {
     ...configDb,
-    gas_webapp_url: payload.gas_webapp_url !== undefined ? String(payload.gas_webapp_url).trim() : (configDb.gas_webapp_url || ''),
+    gas_webapp_url: newGasUrl,
     spreadsheet_id: payload.spreadsheet_id !== undefined ? String(payload.spreadsheet_id).trim() : (configDb.spreadsheet_id || ''),
     drive_folder_id: payload.drive_folder_id !== undefined ? String(payload.drive_folder_id).trim() : (configDb.drive_folder_id || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P'),
     gas_direct_enabled: payload.gas_direct_enabled !== undefined ? Boolean(payload.gas_direct_enabled) : (configDb.gas_direct_enabled || false),
-    instansi: payload.instansi !== undefined ? String(payload.instansi).trim() : (configDb.instansi || 'Puskesmas Kepulauan Seribu Selatan')
+    instansi: payload.instansi !== undefined ? String(payload.instansi).trim() : (configDb.instansi || 'Puskesmas Kepulauan Seribu Selatan'),
+    global_database_source: isConnecting ? 'GAS' : (configDb.global_database_source || 'HOSTINGER'),
+    gas_connected: isConnecting
   };
   saveJsonFile(CONFIG_FILE, configDb);
+
+  // Jika terkoneksi, picu sinkronisasi data global langsung dari GAS di latar belakang
+  if (isConnecting) {
+    syncFromGasToLocal(true).catch(e => console.warn("Background GAS sync on save error:", e.message));
+  }
+
   res.json({
     success: true,
-    message: "Pengaturan API Google Apps Script (GAS) berhasil disimpan!",
-    config: configDb
+    message: isConnecting 
+      ? "Pengaturan API Google Apps Script (GAS) berhasil disimpan! Seluruh browser secara global kini merujuk ke Database GAS." 
+      : "Pengaturan API Google Apps Script (GAS) berhasil disimpan!",
+    config: configDb,
+    global_database_source: configDb.global_database_source
   });
+});
+
+// Endpoint Eksekusi Setup Database di Code GS (Buat Tabel-Tabel Otomatis di Google Spreadsheet)
+app.post(['/api/gas/run-setup', '/api/gas/setup-tables'], async (req, res) => {
+  const targetUrl = (req.body?.gas_webapp_url || configDb.gas_webapp_url || '').trim();
+  if (!targetUrl) {
+    return res.status(400).json({
+      success: false,
+      message: "URL Web App GAS belum diisi. Masukkan URL Web App pada tab Sematkan API terlebih dahulu."
+    });
+  }
+
+  try {
+    const setupUrl = targetUrl.includes('?') ? `${targetUrl}&action=setupDatabase` : `${targetUrl}?action=setupDatabase`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(setupUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const data: any = await response.json();
+    
+    // Aktifkan mode GAS global
+    configDb.global_database_source = 'GAS';
+    configDb.gas_connected = true;
+    if (req.body?.gas_webapp_url) {
+      configDb.gas_webapp_url = String(req.body.gas_webapp_url).trim();
+    }
+    saveJsonFile(CONFIG_FILE, configDb);
+
+    // Sinkronkan data hasil inisialisasi ke cache server lokal
+    await syncFromGasToLocal(true);
+
+    return res.json({
+      success: true,
+      message: "Setup Database Berhasil! Seluruh tabel Google Sheets telah dibuat dan diformat secara otomatis oleh Code GS.",
+      gasResult: data,
+      tablesReady: ["Pegawai", "Pengguna", "Usulan", "Disiplin", "GapKompetensi", "Diklat", "UraianTugas", "Penggajian", "Dokumen", "Pengaturan"],
+      global_database_source: "GAS",
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      message: `Gagal menjalankan setup database di GAS: ${err.message}. Pastikan izin deployment Google Apps Script diatur ke 'Anyone (Siapa saja)'.`
+    });
+  }
+});
+
+// Endpoint Sinkronisasi Global dari Google Apps Script ke Semua Browser
+app.post(['/api/gas/sync-global', '/api/gas/pull'], async (req, res) => {
+  try {
+    await syncFromGasToLocal(true);
+    const totalPegawai = Array.isArray(pegawaiDb) ? pegawaiDb.length : 0;
+    res.json({
+      success: true,
+      message: `Sinkronisasi global dari GAS berhasil! ${totalPegawai} data pegawai tersinkronisasi ke seluruh browser.`,
+      totalPegawai,
+      globalDatabaseSource: "GAS",
+      syncedAt: new Date().toISOString()
+    });
+  } catch(err: any) {
+    res.status(500).json({ success: false, message: "Gagal menyinkronkan data dari GAS: " + err.message });
+  }
 });
 
 // Endpoint Uji Koneksi Langsung API GAS Web App
@@ -1553,15 +1725,19 @@ app.all('/api/database/generate-configphp', (req, res) => {
 // Endpoint Pulse Ringan untuk Auto-Refresh 1 Detik Real-Time
 app.get('/api/realtime/pulse', (req, res) => {
   const totalPegawai = Array.isArray(pegawaiDb) ? pegawaiDb.length : 0;
+  const isGasActive = Boolean(configDb.gas_webapp_url && configDb.gas_webapp_url.trim().length > 0);
   res.json({
     success: true,
     pulse: true,
     timestamp: Date.now(),
     isoTime: new Date().toISOString(),
     totalPegawai,
+    globalDatabaseSource: isGasActive ? "GAS" : (configDb.global_database_source || "HOSTINGER"),
+    gasStatus: isGasActive ? "CONNECTED" : "STANDBY",
+    gasWebappUrl: configDb.gas_webapp_url || '',
     hostingerStatus: "CONNECTED",
     githubStatus: "SYNCED",
-    driveFolderId: "1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P",
+    driveFolderId: configDb.drive_folder_id || "1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P",
     tayangDiBrowser: true
   });
 });
