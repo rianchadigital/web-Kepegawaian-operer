@@ -4724,6 +4724,102 @@
             <section id="pengaturan" class="page-section btn-admin-only">
                 <div class="row g-4">
                     <div class="col-lg-8 col-md-10 mx-auto">
+                        <!-- Card Pengaturan API Google Apps Script (GAS) & Setup Database -->
+                        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
+                            <div class="card-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fab fa-google fs-4 text-warning"></i>
+                                    <h5 class="mb-0 fw-bold">Pengaturan API Google Apps Script (GAS) & Database</h5>
+                                </div>
+                                <span class="badge bg-white text-success rounded-pill px-3 py-2 fw-bold shadow-sm" id="badge-gas-api-status">
+                                    <i class="fas fa-satellite-dish me-1"></i> API GAS Tersemat
+                                </span>
+                            </div>
+                            <div class="card-body p-4">
+                                <form id="form-settings-gas" onsubmit="event.preventDefault(); window.saveGasApiSettings();">
+                                    <div class="alert alert-success border-0 bg-success bg-opacity-10 rounded-3 mb-4">
+                                        <div class="d-flex gap-3 align-items-center">
+                                            <i class="fas fa-link text-success fs-2"></i>
+                                            <div>
+                                                <h6 class="fw-bold text-success mb-1">Sematkan API Web App dari Google Apps Script (GAS)</h6>
+                                                <p class="small text-secondary mb-0">Masukkan URL Web App dari deployment Google Apps Script Anda untuk menghubungkan SIMPEG Digital ke Google Spreadsheet dan Google Drive secara real-time.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- URL Web App GAS -->
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold text-dark d-flex align-items-center justify-content-between">
+                                            <span><i class="fas fa-plug text-primary me-2"></i>URL Web App GAS (API Endpoint) <span class="text-danger">*</span></span>
+                                            <span class="badge bg-light text-muted border">Deploy as Web App</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light text-muted"><i class="fas fa-globe"></i></span>
+                                            <input type="url" class="form-control font-monospace small" id="cfg_gas_webapp_url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+                                            <button type="button" class="btn btn-outline-secondary px-3" onclick="window.pasteGasUrlFromClipboard()" title="Tempel dari Clipboard">
+                                                <i class="fas fa-paste me-1"></i> Tempel
+                                            </button>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            Dapatkan URL ini dari menu <strong>Deploy ➔ New Deployment ➔ Web App</strong> di editor Google Apps Script (Atur "Who has access" ke <em>Anyone</em>).
+                                        </small>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <!-- ID Google Spreadsheet -->
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-excel text-success me-2"></i>ID Google Spreadsheet</label>
+                                            <input type="text" class="form-control font-monospace" id="cfg_spreadsheet_id" placeholder="Contoh: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs...">
+                                            <small class="text-muted d-block mt-1">ID Spreadsheet yang diambil dari tautan Google Sheet antara <code>/d/</code> dan <code>/edit</code>.</small>
+                                        </div>
+
+                                        <!-- ID Folder Google Drive -->
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-dark"><i class="fab fa-google-drive text-warning me-2"></i>ID Folder Google Drive</label>
+                                            <input type="text" class="form-control font-monospace" id="cfg_drive_folder_id" value="1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" readonly>
+                                            <small class="text-muted d-block mt-1">Folder induk penyimpanan foto profil dan arsip digital pegawai di Google Drive.</small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Direct Mode Switch -->
+                                    <div class="p-3 bg-light rounded-3 border mb-4">
+                                        <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0 mb-1">
+                                            <label class="form-check-label fw-bold text-dark" for="cfg_gas_direct_enabled">
+                                                <i class="fas fa-bolt text-warning me-2"></i> Gunakan Komunikasi Langsung ke API GAS Web App (Direct Mode)
+                                            </label>
+                                            <input class="form-check-input ms-3" type="checkbox" id="cfg_gas_direct_enabled" style="width: 2.8em; height: 1.4em;">
+                                        </div>
+                                        <small class="text-muted d-block">
+                                            Jika diaktifkan, permintaan data akan langsung dikirim ke URL Google Apps Script Anda tanpa melalui proxy perantara.
+                                        </small>
+                                    </div>
+
+                                    <!-- Status Koneksi Alert -->
+                                    <div id="gasPingResultBox" class="alert alert-secondary border-0 rounded-3 p-3 mb-4 d-none">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i id="gasPingIcon" class="fas fa-info-circle text-primary"></i>
+                                            <span id="gasPingText" class="small fw-semibold">Memeriksa koneksi...</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold" onclick="window.testGasApiConnection()">
+                                                <i class="fas fa-plug me-1"></i> Uji Koneksi API GAS
+                                            </button>
+                                            <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold" onclick="window.openSetupDatabaseModal()">
+                                                <i class="fas fa-magic me-1"></i> Setup & Generator Berkas
+                                            </button>
+                                        </div>
+                                        <button type="button" class="btn btn-primary btn-md rounded-pill shadow-sm px-4 fw-bold" onclick="window.saveGasApiSettings()">
+                                            <i class="fas fa-save me-2"></i> Simpan Pengaturan API GAS
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
                         <!-- Card Utama Preferensi & Anti-Reset -->
                         <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
                             <div class="card-header bg-primary bg-gradient text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between">
@@ -6433,101 +6529,294 @@
 
         <!-- MODAL SETUP DATABASE & SINKRONISASI LANGSUNG (GAS SPREADSHEET & MYSQL HOSTINGER) -->
         <div class="modal fade" id="modalSetupDatabase" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
                     <div class="modal-header text-white py-3 px-4" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
                         <div class="d-flex align-items-center gap-2">
                             <i class="fas fa-database fs-3"></i>
                             <div>
-                                <h5 class="modal-title fw-bold mb-0">Setup Database & Sinkronisasi Langsung</h5>
-                                <p class="small text-white-50 mb-0">Google Apps Script (GAS) Spreadsheet & MySQL Hostinger Terintegrasi</p>
+                                <h5 class="modal-title fw-bold mb-0">Setup Database & Generator Berkas SIMPEG</h5>
+                                <p class="small text-white-50 mb-0">Sematkan API GAS, Buat Berkas Database Otomatis, & Sinkronisasi Dua Arah</p>
                             </div>
                         </div>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
+
+                    <!-- Nav Tabs for Modal -->
+                    <div class="bg-white border-bottom px-4 pt-2">
+                        <ul class="nav nav-tabs border-0" id="setupDbTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active fw-bold text-success border-0 border-bottom border-3 border-success py-2.5 px-3" id="tab-generator-files-btn" data-bs-toggle="tab" data-bs-target="#tab-generator-files" type="button" role="tab">
+                                    <i class="fas fa-file-code me-2"></i>1. Generator Berkas Database (Mudah Buat File)
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-bold text-secondary border-0 py-2.5 px-3" id="tab-embed-gas-btn" data-bs-toggle="tab" data-bs-target="#tab-embed-gas" type="button" role="tab">
+                                    <i class="fab fa-google text-warning me-2"></i>2. Sematkan API Web App GAS
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-bold text-secondary border-0 py-2.5 px-3" id="tab-status-sync-btn" data-bs-toggle="tab" data-bs-target="#tab-status-sync" type="button" role="tab">
+                                    <i class="fas fa-sync-alt text-primary me-2"></i>3. Status & Sinkronisasi Langsung
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+
                     <div class="modal-body p-4 bg-light">
-                        <!-- Alert Status Setup -->
-                        <div id="setupDbAlertBanner" class="alert alert-success border-0 shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center gap-3">
-                            <i class="fas fa-check-circle fs-2 text-success"></i>
-                            <div>
-                                <h6 class="fw-bold mb-1 text-dark" id="setupDbAlertTitle">Database & Penyimpanan Siap Digunakan</h6>
-                                <p class="small mb-0 text-secondary" id="setupDbAlertDesc">Google Spreadsheet via GAS dan MySQL Hostinger terhubung dan siap melakukan sinkronisasi dua arah secara langsung.</p>
-                            </div>
-                        </div>
-
-                        <!-- 3 Cards: GAS Spreadsheet, MySQL Hostinger, Google Drive -->
-                        <div class="row g-3 mb-4">
-                            <!-- Card 1: Google Apps Script Spreadsheet -->
-                            <div class="col-md-4">
-                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-success d-flex flex-column justify-content-between">
+                        <div class="tab-content" id="setupDbTabsContent">
+                            <!-- TAB 1: GENERATOR BERKAS DATABASE (MUDAH MEMBUAT FILE) -->
+                            <div class="tab-pane fade show active" id="tab-generator-files" role="tabpanel">
+                                <div class="alert alert-success border-0 bg-success bg-opacity-10 rounded-3 mb-4 d-flex align-items-center gap-3">
+                                    <i class="fas fa-magic fs-2 text-success"></i>
                                     <div>
-                                        <div class="d-flex align-items-center justify-content-between mb-2">
-                                            <span class="fw-bold text-success small"><i class="fas fa-file-excel me-1"></i> GAS Spreadsheet</span>
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" id="badgeGasStatus">Terhubung</span>
-                                        </div>
-                                        <p class="small text-muted mb-2" style="font-size:0.75rem;">10 Sheet Relasional otomatis dibuat untuk Master Pegawai, Pengguna, Usulan, Disiplin, dan Diklat.</p>
+                                        <h6 class="fw-bold mb-1 text-success">Pembuat Berkas Database 1-Klik Siap Pakai</h6>
+                                        <p class="small mb-0 text-secondary">Seluruh berkas database telah dikonfigurasi secara otomatis dengan ID Spreadsheet, Folder Google Drive (<code>1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</code>), dan MySQL Hostinger. Anda dapat langsung mengunduh atau menyalin kodenya.</p>
                                     </div>
-                                    <div class="pt-2 border-top">
-                                        <button class="btn btn-sm btn-outline-success w-100 rounded-pill fw-bold" onclick="window.downloadFileFromServer('/Code.gs', 'Code.gs')">
-                                            <i class="fas fa-code me-1"></i> Unduh Code.gs
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <!-- 1. Code.gs -->
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 d-flex flex-column justify-content-between border-start border-4 border-success">
+                                            <div>
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="fw-bold text-success small"><i class="fas fa-code me-1"></i> Code.gs (GAS)</span>
+                                                    <span class="badge bg-success-subtle text-success">Google Script</span>
+                                                </div>
+                                                <p class="small text-muted mb-2" style="font-size:0.75rem;">
+                                                    Backend Google Apps Script dengan 10 Sheet relasional & auto upload foto ke Drive.
+                                                </p>
+                                            </div>
+                                            <div class="pt-2 border-top d-flex flex-column gap-1">
+                                                <button class="btn btn-sm btn-success w-100 rounded-pill fw-bold" onclick="window.downloadCustomCodeGs()">
+                                                    <i class="fas fa-download me-1"></i> Unduh Code.gs
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-success w-100 rounded-pill fw-bold" onclick="window.copyCustomCodeGs()">
+                                                    <i class="fas fa-copy me-1"></i> Salin Kode
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. config.php -->
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 d-flex flex-column justify-content-between border-start border-4 border-primary">
+                                            <div>
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="fw-bold text-primary small"><i class="fab fa-php me-1"></i> config.php</span>
+                                                    <span class="badge bg-primary-subtle text-primary">MySQL PDO</span>
+                                                </div>
+                                                <p class="small text-muted mb-2" style="font-size:0.75rem;">
+                                                    Koneksi MySQL Hostinger (<code>u133879636_dbsimpegkawan</code>) siap upload ke server hosting.
+                                                </p>
+                                            </div>
+                                            <div class="pt-2 border-top d-flex flex-column gap-1">
+                                                <button class="btn btn-sm btn-primary w-100 rounded-pill fw-bold shadow-xs" onclick="window.downloadCustomConfigPhp()">
+                                                    <i class="fas fa-download me-1"></i> Unduh config.php
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-primary w-100 rounded-pill fw-bold" onclick="window.copyCustomConfigPhp()">
+                                                    <i class="fas fa-copy me-1"></i> Salin Kode
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 3. database_simpeg.sql -->
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 d-flex flex-column justify-content-between border-start border-4 border-warning">
+                                            <div>
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="fw-bold text-dark small"><i class="fas fa-database text-warning me-1"></i> Script SQL</span>
+                                                    <span class="badge bg-warning-subtle text-dark">phpMyAdmin</span>
+                                                </div>
+                                                <p class="small text-muted mb-2" style="font-size:0.75rem;">
+                                                    Skrip pembuatan tabel MySQL lengkap (users, pegawai, usulan, diklat, dll).
+                                                </p>
+                                            </div>
+                                            <div class="pt-2 border-top d-flex flex-column gap-1">
+                                                <button class="btn btn-sm btn-warning text-dark w-100 rounded-pill fw-bold" onclick="window.downloadCustomSql()">
+                                                    <i class="fas fa-download me-1"></i> Unduh SQL
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning text-dark w-100 rounded-pill fw-bold" onclick="window.copyCustomSql()">
+                                                    <i class="fas fa-copy me-1"></i> Salin Script
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Template Excel / CSV -->
+                                    <div class="col-md-6 col-lg-3">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 d-flex flex-column justify-content-between border-start border-4 border-info">
+                                            <div>
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="fw-bold text-info small"><i class="fas fa-file-excel me-1"></i> Template Data</span>
+                                                    <span class="badge bg-info-subtle text-info">Import CSV</span>
+                                                </div>
+                                                <p class="small text-muted mb-2" style="font-size:0.75rem;">
+                                                    Format kolom standar untuk import ratusan pegawai sekaligus ke sistem.
+                                                </p>
+                                            </div>
+                                            <div class="pt-2 border-top d-flex flex-column gap-1">
+                                                <button class="btn btn-sm btn-info text-white w-100 rounded-pill fw-bold" onclick="window.downloadTemplatePegawaiCSV()">
+                                                    <i class="fas fa-file-csv me-1"></i> Template CSV
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-info w-100 rounded-pill fw-bold" onclick="window.downloadTemplatePegawaiJSON()">
+                                                    <i class="fas fa-file-code me-1"></i> Template JSON
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Panduan 3 Langkah Pemasangan -->
+                                <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-3">
+                                    <h6 class="fw-bold text-dark mb-3"><i class="fas fa-list-check text-success me-2"></i>Panduan Cepat Pemasangan Database:</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <div class="p-3 bg-light rounded-3 border h-100">
+                                                <span class="badge bg-success rounded-circle me-1 mb-2">1</span>
+                                                <h6 class="fw-bold text-dark mb-1">Google Spreadsheet</h6>
+                                                <p class="small text-muted mb-0" style="font-size:0.8rem;">Buka Google Spreadsheet ➔ Ekstensi ➔ Apps Script ➔ Paste isi <code>Code.gs</code> ➔ Klik Deploy sebagai Web App.</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="p-3 bg-light rounded-3 border h-100">
+                                                <span class="badge bg-primary rounded-circle me-1 mb-2">2</span>
+                                                <h6 class="fw-bold text-dark mb-1">Sematkan API</h6>
+                                                <p class="small text-muted mb-0" style="font-size:0.8rem;">Salin URL Web App yang didapat dari Google Apps Script, lalu tempel pada tab <strong>"2. Sematkan API Web App GAS"</strong> di atas.</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="p-3 bg-light rounded-3 border h-100">
+                                                <span class="badge bg-warning text-dark rounded-circle me-1 mb-2">3</span>
+                                                <h6 class="fw-bold text-dark mb-1">MySQL Hostinger</h6>
+                                                <p class="small text-muted mb-0" style="font-size:0.8rem;">Buka phpMyAdmin di cPanel/hPanel Hostinger, klik Import dan upload file <code>database_simpeg.sql</code>.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- TAB 2: SEMATKAN API GAS -->
+                            <div class="tab-pane fade" id="tab-embed-gas" role="tabpanel">
+                                <div class="bg-white border rounded-4 p-4 shadow-sm mb-3">
+                                    <h6 class="fw-bold text-dark mb-2"><i class="fab fa-google text-warning me-2"></i>Sematkan URL API Web App Google Apps Script</h6>
+                                    <p class="small text-muted mb-4">Tempel URL Web App dari deployment Google Apps Script Anda agar frontend dapat berinteraksi langsung dengan Google Sheets dan Google Drive.</p>
+
+                                    <!-- Form Input URL API -->
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold text-dark d-flex align-items-center justify-content-between">
+                                            <span>URL Web App Google Apps Script (Exec Endpoint) <span class="text-danger">*</span></span>
+                                            <span class="badge bg-light text-muted border">Deployment: Web App</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light text-muted"><i class="fas fa-link"></i></span>
+                                            <input type="url" class="form-control font-monospace" id="modal_cfg_gas_url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+                                            <button class="btn btn-outline-secondary px-3" type="button" onclick="window.pasteModalGasUrl()">
+                                                <i class="fas fa-paste me-1"></i> Tempel
+                                            </button>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">Pastikan pengaturan deployment Google Apps Script diatur: <em>Execute as: Me</em> dan <em>Who has access: Anyone</em>.</small>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-excel text-success me-2"></i>ID Google Spreadsheet</label>
+                                            <input type="text" class="form-control font-monospace" id="modal_cfg_spreadsheet_id" placeholder="ID Spreadsheet (opsional jika script di dalam spreadsheet)">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-dark"><i class="fab fa-google-drive text-warning me-2"></i>ID Folder Google Drive</label>
+                                            <input type="text" class="form-control font-monospace" id="modal_cfg_drive_folder" value="1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" readonly>
+                                        </div>
+                                    </div>
+
+                                    <!-- Alert Ping Status -->
+                                    <div id="modalGasPingResult" class="alert alert-secondary border-0 rounded-3 p-3 mb-3 d-none">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i id="modalGasPingIcon" class="fas fa-info-circle text-primary"></i>
+                                            <span id="modalGasPingText" class="small fw-semibold">Memeriksa koneksi...</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
+                                        <button type="button" class="btn btn-outline-primary rounded-pill px-3 fw-bold" onclick="window.testModalGasConnection()">
+                                            <i class="fas fa-plug me-1"></i> Uji Koneksi API GAS
+                                        </button>
+                                        <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" onclick="window.saveModalGasConfig()">
+                                            <i class="fas fa-save me-1"></i> Simpan & Terapkan API GAS
                                         </button>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Card 2: MySQL Hostinger Database -->
-                            <div class="col-md-4">
-                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-primary d-flex flex-column justify-content-between">
+                            <!-- TAB 3: STATUS & SINKRONISASI LANGSUNG -->
+                            <div class="tab-pane fade" id="tab-status-sync" role="tabpanel">
+                                <!-- Status Card -->
+                                <div id="setupDbAlertBanner" class="alert alert-success border-0 shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center gap-3">
+                                    <i class="fas fa-check-circle fs-2 text-success"></i>
                                     <div>
-                                        <div class="d-flex align-items-center justify-content-between mb-2">
-                                            <span class="fw-bold text-primary small"><i class="fas fa-server me-1"></i> MySQL Hostinger</span>
-                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">Aktif (Live)</span>
-                                        </div>
-                                        <div class="font-monospace fw-bold text-dark small" style="font-size:0.75rem;">u133879636_dbsimpegkawan</div>
-                                        <p class="small text-muted mb-2" style="font-size:0.75rem;">Hostinger cPanel/hPanel dengan driver PDO MariaDB/MySQL.</p>
+                                        <h6 class="fw-bold mb-1 text-dark" id="setupDbAlertTitle">Database & Penyimpanan Siap Digunakan</h6>
+                                        <p class="small mb-0 text-secondary" id="setupDbAlertDesc">Google Spreadsheet via GAS dan MySQL Hostinger terhubung dan siap melakukan sinkronisasi dua arah secara langsung.</p>
                                     </div>
-                                    <div class="pt-2 border-top">
-                                        <button class="btn btn-sm btn-outline-primary w-100 rounded-pill fw-bold" onclick="window.syncAllToHostinger(true)">
-                                            <i class="fas fa-sync-alt me-1"></i> Sinkronkan MySQL
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <!-- Card 1: GAS Spreadsheet -->
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-success">
+                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                <span class="fw-bold text-success small"><i class="fas fa-file-excel me-1"></i> GAS Spreadsheet</span>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" id="badgeGasStatus">Terhubung</span>
+                                            </div>
+                                            <p class="small text-muted mb-2" style="font-size:0.75rem;">10 Sheet Relasional otomatis dibuat untuk Pegawai, Pengguna, Usulan, Disiplin, dan Diklat.</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card 2: MySQL Hostinger Database -->
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-primary">
+                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                <span class="fw-bold text-primary small"><i class="fas fa-server me-1"></i> MySQL Hostinger</span>
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">Aktif (Live)</span>
+                                            </div>
+                                            <div class="font-monospace fw-bold text-dark small" style="font-size:0.75rem;">u133879636_dbsimpegkawan</div>
+                                            <p class="small text-muted mb-0" style="font-size:0.75rem;">Hostinger cPanel/hPanel dengan driver PDO MariaDB/MySQL.</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card 3: Google Drive Folder ID -->
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-warning">
+                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                <span class="fw-bold text-dark small"><i class="fab fa-google-drive text-warning me-1"></i> Google Drive</span>
+                                                <span class="badge bg-warning-subtle text-dark border border-warning-subtle rounded-pill">Folder Aktif</span>
+                                            </div>
+                                            <div class="font-monospace fw-bold text-dark small" style="font-size:0.7rem; word-break: break-all;">1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</div>
+                                            <p class="small text-muted mb-0" style="font-size:0.75rem;">Folder foto profil & berkas arsip pegawai tersimpan langsung di Google Drive.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Action Controls -->
+                                <div class="p-3 bg-white border rounded-4 shadow-sm mb-3">
+                                    <h6 class="fw-bold text-dark mb-2"><i class="fas fa-magic text-success me-2"></i>Aksi Cepat Setup & Sinkronisasi Database</h6>
+                                    <p class="small text-muted mb-3">Jalankan proses setup otomatis untuk menginisialisasi skema tabel dan menyinkronkan seluruh master pegawai secara langsung:</p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" id="btnRunSetupDatabase" onclick="window.runSetupDatabaseSync()">
+                                            <i class="fas fa-play-circle me-1"></i> Setup & Sinkronkan Sekarang
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary rounded-pill px-3 fw-bold" onclick="window.syncAllToHostinger(true)">
+                                            <i class="fas fa-cloud-upload-alt me-1"></i> Sinkronkan ke Hostinger MySQL
+                                        </button>
+                                        <button type="button" class="btn btn-outline-success rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS(true)">
+                                            <i class="fas fa-cloud-download-alt me-1"></i> Tarik Data dari GAS / Database
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary rounded-pill px-3 fw-bold" onclick="window.clearLocalPegawaiStorage(true)">
+                                            <i class="fas fa-broom me-1"></i> Bersihkan Cache Lokal Browser
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Card 3: Google Drive Folder ID -->
-                            <div class="col-md-4">
-                                <div class="p-3 bg-white border rounded-4 shadow-sm h-100 border-start border-4 border-warning d-flex flex-column justify-content-between">
-                                    <div>
-                                        <div class="d-flex align-items-center justify-content-between mb-2">
-                                            <span class="fw-bold text-dark small"><i class="fab fa-google-drive text-warning me-1"></i> Google Drive</span>
-                                            <span class="badge bg-warning-subtle text-dark border border-warning-subtle rounded-pill">Folder Aktif</span>
-                                        </div>
-                                        <div class="font-monospace fw-bold text-dark small" style="font-size:0.7rem; word-break: break-all;">1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</div>
-                                        <p class="small text-muted mb-2" style="font-size:0.75rem;">Folder foto profil & berkas arsip pegawai tersimpan langsung di Google Drive.</p>
-                                    </div>
-                                    <div class="pt-2 border-top">
-                                        <a href="https://drive.google.com/drive/u/0/folders/1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P" target="_blank" class="btn btn-sm btn-outline-warning text-dark w-100 rounded-pill fw-bold">
-                                            <i class="fas fa-external-link-alt me-1"></i> Buka Google Drive
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Action Controls -->
-                        <div class="p-3 bg-white border rounded-4 shadow-sm mb-3">
-                            <h6 class="fw-bold text-dark mb-2"><i class="fas fa-magic text-success me-2"></i>Aksi Cepat Setup & Sinkronisasi Database</h6>
-                            <p class="small text-muted mb-3">Jalankan proses setup otomatis untuk menginisialisasi skema tabel dan menyinkronkan seluruh master pegawai secara langsung:</p>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" id="btnRunSetupDatabase" onclick="window.runSetupDatabaseSync()">
-                                    <i class="fas fa-play-circle me-1"></i> Setup & Sinkronkan Sekarang
-                                </button>
-                                <button type="button" class="btn btn-outline-success rounded-pill px-3 fw-bold" onclick="window.loadDataFromGAS(true)">
-                                    <i class="fas fa-cloud-download-alt me-1"></i> Tarik Data dari GAS / Database
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 fw-bold" onclick="window.clearLocalPegawaiStorage(true)">
-                                    <i class="fas fa-broom me-1"></i> Bersihkan Cache Lokal Browser
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -12027,6 +12316,228 @@
                 });
             };
             reader.readAsDataURL(file);
+        };
+
+        // =========================================================================
+        // 5. PENGATURAN API GAS & GENERATOR BERKAS DATABASE (MUDAH MEMBUAT FILE)
+        // =========================================================================
+        window.loadGasConfig = function() {
+            const endpoint = window.getApiEndpoint ? window.getApiEndpoint('getGasConfig') : '/api/gas/config';
+            fetch(endpoint)
+                .then(r => r.ok ? r.json() : null)
+                .then(res => {
+                    const cfg = (res && res.config) ? res.config : {};
+                    const localUrl = localStorage.getItem('simpeg_gas_webapp_url') || cfg.gas_webapp_url || '';
+                    const localSsId = localStorage.getItem('simpeg_spreadsheet_id') || cfg.spreadsheet_id || '';
+                    const localDriveId = cfg.drive_folder_id || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P';
+
+                    $('#cfg_gas_webapp_url').val(localUrl);
+                    $('#modal_cfg_gas_url').val(localUrl);
+                    $('#cfg_spreadsheet_id').val(localSsId);
+                    $('#modal_cfg_spreadsheet_id').val(localSsId);
+                    $('#cfg_drive_folder_id').val(localDriveId);
+                    $('#modal_cfg_drive_folder').val(localDriveId);
+                    $('#cfg_gas_direct_enabled').prop('checked', !!cfg.gas_direct_enabled);
+
+                    if (localUrl) {
+                        $('#badge-gas-api-status').html('<i class="fas fa-check-circle text-success me-1"></i> API GAS Tersemat').removeClass('bg-secondary text-white').addClass('bg-white text-success');
+                        $('#badgeGasStatus').text('Tersemat (Aktif)');
+                    }
+                })
+                .catch(() => {
+                    const localUrl = localStorage.getItem('simpeg_gas_webapp_url') || '';
+                    const localSsId = localStorage.getItem('simpeg_spreadsheet_id') || '';
+                    $('#cfg_gas_webapp_url, #modal_cfg_gas_url').val(localUrl);
+                    $('#cfg_spreadsheet_id, #modal_cfg_spreadsheet_id').val(localSsId);
+                });
+        };
+
+        window.saveGasApiSettings = function(fromModal = false) {
+            const url = fromModal ? $('#modal_cfg_gas_url').val().trim() : $('#cfg_gas_webapp_url').val().trim();
+            const ssId = fromModal ? $('#modal_cfg_spreadsheet_id').val().trim() : $('#cfg_spreadsheet_id').val().trim();
+            const driveId = fromModal ? $('#modal_cfg_drive_folder').val().trim() : $('#cfg_drive_folder_id').val().trim();
+            const directMode = $('#cfg_gas_direct_enabled').is(':checked');
+
+            localStorage.setItem('simpeg_gas_webapp_url', url);
+            localStorage.setItem('simpeg_spreadsheet_id', ssId);
+
+            // Sync values across UI inputs
+            $('#cfg_gas_webapp_url, #modal_cfg_gas_url').val(url);
+            $('#cfg_spreadsheet_id, #modal_cfg_spreadsheet_id').val(ssId);
+
+            const endpoint = window.getApiEndpoint ? window.getApiEndpoint('saveGasConfig') : '/api/gas/config';
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gas_webapp_url: url,
+                    spreadsheet_id: ssId,
+                    drive_folder_id: driveId || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P',
+                    gas_direct_enabled: directMode
+                })
+            })
+            .then(r => r.json())
+            .then(res => {
+                showToast("Pengaturan API GAS berhasil disimpan & disematkan ke sistem!", "success");
+                $('#badge-gas-api-status').html('<i class="fas fa-check-circle text-success me-1"></i> API GAS Tersemat');
+                $('#badgeGasStatus').text('Tersemat (Aktif)');
+            })
+            .catch(() => {
+                showToast("Pengaturan API GAS berhasil disimpan di browser lokal!", "info");
+            });
+        };
+
+        window.saveModalGasConfig = function() {
+            window.saveGasApiSettings(true);
+        };
+
+        window.testGasApiConnection = function(fromModal = false) {
+            const url = fromModal ? $('#modal_cfg_gas_url').val().trim() : $('#cfg_gas_webapp_url').val().trim();
+            const alertBox = fromModal ? $('#modalGasPingResult') : $('#gasPingResultBox');
+            const alertText = fromModal ? $('#modalGasPingText') : $('#gasPingText');
+            const alertIcon = fromModal ? $('#modalGasPingIcon') : $('#gasPingIcon');
+
+            if (!url) {
+                showToast("Harap masukkan URL Web App GAS terlebih dahulu.", "warning");
+                return;
+            }
+
+            alertBox.removeClass('d-none alert-success alert-danger alert-secondary').addClass('alert-info');
+            alertIcon.attr('class', 'fas fa-spinner fa-spin text-primary');
+            alertText.text("Menguji koneksi ke API GAS Web App...");
+
+            fetch('/api/gas/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gas_webapp_url: url })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res && res.success) {
+                    alertBox.removeClass('alert-info alert-danger').addClass('alert-success');
+                    alertIcon.attr('class', 'fas fa-check-circle text-success');
+                    alertText.text(res.message || "Koneksi API GAS Berhasil Terverifikasi!");
+                    showToast("API GAS terhubung dengan sukses!", "success");
+                    $('#badge-gas-api-status').html('<i class="fas fa-satellite-dish me-1"></i> API GAS Aktif');
+                    $('#badgeGasStatus').text('Aktif (Online)');
+                } else {
+                    alertBox.removeClass('alert-info alert-success').addClass('alert-danger');
+                    alertIcon.attr('class', 'fas fa-exclamation-triangle text-danger');
+                    alertText.text(res.message || "Koneksi ke API GAS gagal.");
+                    showToast(res.message || "Gagal menghubungkan ke API GAS", "danger");
+                }
+            })
+            .catch(err => {
+                // Direct client-side fetch test fallback
+                fetch(`${url}?action=ping`, { mode: 'no-cors' })
+                    .then(() => {
+                        alertBox.removeClass('alert-info alert-danger').addClass('alert-success');
+                        alertIcon.attr('class', 'fas fa-check-circle text-success');
+                        alertText.text("Endpoint API GAS merespon secara langsung (CORS Mode)!");
+                        showToast("Endpoint API GAS merespon!", "success");
+                    })
+                    .catch(e => {
+                        alertBox.removeClass('alert-info alert-success').addClass('alert-danger');
+                        alertIcon.attr('class', 'fas fa-times-circle text-danger');
+                        alertText.text("Tidak dapat menghubungi URL: " + e.message);
+                    });
+            });
+        };
+
+        window.testModalGasConnection = function() {
+            window.testGasApiConnection(true);
+        };
+
+        window.pasteGasUrlFromClipboard = async function() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text && text.includes('script.google.com')) {
+                    $('#cfg_gas_webapp_url').val(text.trim());
+                    showToast("URL API GAS berhasil ditempel dari clipboard!", "success");
+                } else {
+                    showToast("Teks clipboard bukan tautan Google Apps Script yang valid.", "warning");
+                }
+            } catch(e) {
+                showToast("Silakan paste manual menggunakan Ctrl+V pada kolom URL.", "info");
+            }
+        };
+
+        window.pasteModalGasUrl = async function() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text && text.includes('script.google.com')) {
+                    $('#modal_cfg_gas_url').val(text.trim());
+                    showToast("URL API GAS berhasil ditempel dari clipboard!", "success");
+                } else {
+                    showToast("Silakan tempel (Ctrl+V) tautan Web App GAS Anda.", "info");
+                }
+            } catch(e) {
+                showToast("Silakan paste manual menggunakan Ctrl+V.", "info");
+            }
+        };
+
+        // --- GENERATOR & DOWNLOAD FILE DATABASE OTOMATIS ---
+        window.downloadCustomCodeGs = function() {
+            const ssId = $('#modal_cfg_spreadsheet_id').val() || $('#cfg_spreadsheet_id').val() || '';
+            const driveId = $('#modal_cfg_drive_folder').val() || $('#cfg_drive_folder_id').val() || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P';
+            const url = `/api/database/generate-codegs?download=1&spreadsheet_id=${encodeURIComponent(ssId)}&drive_folder_id=${encodeURIComponent(driveId)}`;
+            window.downloadFileFromServer(url, 'Code.gs');
+            showToast("Mengunduh berkas Code.gs dengan konfigurasi tersemat...", "success");
+        };
+
+        window.copyCustomCodeGs = function() {
+            const ssId = $('#modal_cfg_spreadsheet_id').val() || $('#cfg_spreadsheet_id').val() || '';
+            const driveId = $('#modal_cfg_drive_folder').val() || $('#cfg_drive_folder_id').val() || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P';
+            fetch(`/api/database/generate-codegs?spreadsheet_id=${encodeURIComponent(ssId)}&drive_folder_id=${encodeURIComponent(driveId)}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res && res.code) {
+                        navigator.clipboard.writeText(res.code).then(() => {
+                            showToast("Kode Code.gs lengkap berhasil disalin ke clipboard! Siap dipaste ke editor Apps Script.", "success");
+                        });
+                    }
+                })
+                .catch(() => {
+                    window.downloadCustomCodeGs();
+                });
+        };
+
+        window.downloadCustomConfigPhp = function() {
+            window.downloadFileFromServer('/api/database/generate-configphp?download=1', 'config.php');
+            showToast("Mengunduh berkas config.php untuk Hostinger MySQL...", "success");
+        };
+
+        window.copyCustomConfigPhp = function() {
+            fetch('/api/database/generate-configphp')
+                .then(r => r.json())
+                .then(res => {
+                    if (res && res.code) {
+                        navigator.clipboard.writeText(res.code).then(() => {
+                            showToast("Kode config.php berhasil disalin ke clipboard!", "success");
+                        });
+                    }
+                })
+                .catch(() => {
+                    window.downloadCustomConfigPhp();
+                });
+        };
+
+        window.downloadCustomSql = function() {
+            window.downloadFileFromServer('/database_simpeg.sql', 'database_simpeg.sql');
+            showToast("Mengunduh berkas skrip database_simpeg.sql untuk phpMyAdmin...", "success");
+        };
+
+        window.copyCustomSql = function() {
+            fetch('/database_simpeg.sql')
+                .then(r => r.text())
+                .then(sql => {
+                    navigator.clipboard.writeText(sql).then(() => {
+                        showToast("Skrip SQL database_simpeg.sql berhasil disalin ke clipboard!", "success");
+                    });
+                })
+                .catch(() => {
+                    window.downloadCustomSql();
+                });
         };
 
         function refreshAllData() {
@@ -29362,6 +29873,9 @@
             loadDataFromGAS();
             if (window.autoRefreshEngine && typeof window.autoRefreshEngine.init === 'function') {
                 window.autoRefreshEngine.init();
+            }
+            if (typeof window.loadGasConfig === 'function') {
+                window.loadGasConfig();
             }
             window.initMasterJabatanData();
             window.populateJabatanDatalists();

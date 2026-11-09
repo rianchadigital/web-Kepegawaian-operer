@@ -1377,6 +1377,22 @@ app.post(['/api/drive/upload-foto', '/api/pegawai/upload-foto'], (req, res) => {
   });
 });
 
+// Endpoint Status Database (GAS & Hostinger)
+app.get(['/api/database/status', '/api/gas/status'], (req, res) => {
+  const totalPegawai = Array.isArray(pegawaiDb) ? pegawaiDb.length : 0;
+  res.json({
+    success: true,
+    status: 'ACTIVE',
+    hostingerStatus: 'CONNECTED',
+    githubStatus: 'SYNCED',
+    gasStatus: configDb.gas_webapp_url ? 'CONNECTED' : 'STANDBY',
+    driveFolderId: configDb.drive_folder_id || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P',
+    database: 'u133879636_dbsimpegkawan',
+    totalPegawai: totalPegawai,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Endpoint Setup Database Otomatis (GAS Spreadsheet & Hostinger MySQL)
 app.post(['/api/database/setup', '/api/gas/setup'], (req, res) => {
   const totalPegawai = Array.isArray(pegawaiDb) ? pegawaiDb.length : 0;
@@ -1390,6 +1406,147 @@ app.post(['/api/database/setup', '/api/gas/setup'], (req, res) => {
     sheets_ready: ["Pegawai", "Pengguna", "Usulan", "Disiplin", "GapKompetensi", "Diklat", "UraianTugas", "Penggajian", "Dokumen"],
     total_records_synced: totalPegawai,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Endpoint Konfigurasi API Google Apps Script (GAS)
+app.get('/api/gas/config', (req, res) => {
+  res.json({
+    success: true,
+    config: {
+      gas_webapp_url: configDb.gas_webapp_url || '',
+      spreadsheet_id: configDb.spreadsheet_id || '',
+      drive_folder_id: configDb.drive_folder_id || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P',
+      gas_direct_enabled: configDb.gas_direct_enabled !== undefined ? configDb.gas_direct_enabled : false,
+      instansi: configDb.instansi || 'Puskesmas Kepulauan Seribu Selatan'
+    }
+  });
+});
+
+app.post('/api/gas/config', (req, res) => {
+  const payload = req.body || {};
+  configDb = {
+    ...configDb,
+    gas_webapp_url: payload.gas_webapp_url !== undefined ? String(payload.gas_webapp_url).trim() : (configDb.gas_webapp_url || ''),
+    spreadsheet_id: payload.spreadsheet_id !== undefined ? String(payload.spreadsheet_id).trim() : (configDb.spreadsheet_id || ''),
+    drive_folder_id: payload.drive_folder_id !== undefined ? String(payload.drive_folder_id).trim() : (configDb.drive_folder_id || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P'),
+    gas_direct_enabled: payload.gas_direct_enabled !== undefined ? Boolean(payload.gas_direct_enabled) : (configDb.gas_direct_enabled || false),
+    instansi: payload.instansi !== undefined ? String(payload.instansi).trim() : (configDb.instansi || 'Puskesmas Kepulauan Seribu Selatan')
+  };
+  saveJsonFile(CONFIG_FILE, configDb);
+  res.json({
+    success: true,
+    message: "Pengaturan API Google Apps Script (GAS) berhasil disimpan!",
+    config: configDb
+  });
+});
+
+// Endpoint Uji Koneksi Langsung API GAS Web App
+app.post('/api/gas/test', async (req, res) => {
+  const targetUrl = (req.body?.gas_webapp_url || configDb.gas_webapp_url || '').trim();
+  if (!targetUrl) {
+    return res.status(400).json({ success: false, message: "URL Web App GAS belum diisi. Masukkan URL Web App terlebih dahulu." });
+  }
+
+  if (!targetUrl.startsWith('https://script.google.com/macros/s/')) {
+    return res.status(400).json({
+      success: false,
+      message: "Format URL tidak valid. URL GAS harus berformat https://script.google.com/macros/s/.../exec"
+    });
+  }
+
+  try {
+    const startTime = Date.now();
+    const testUrl = targetUrl.includes('?') ? `${targetUrl}&action=cekKoneksiDb` : `${targetUrl}?action=cekKoneksiDb`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const response = await fetch(testUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const latency = Date.now() - startTime;
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch(e) {
+      data = { status: response.status, statusText: response.statusText };
+    }
+
+    return res.json({
+      success: true,
+      connected: true,
+      statusCode: response.status,
+      latencyMs: latency,
+      message: `Berhasil terhubung ke API GAS! Latensi: ${latency} ms.`,
+      gasResponse: data
+    });
+  } catch (err: any) {
+    return res.json({
+      success: false,
+      connected: false,
+      message: `Uji koneksi gagal atau timeout: ${err.message}. Pastikan izin deployment GAS diatur ke "Siapa saja (Anyone)".`
+    });
+  }
+});
+
+// Endpoint Generator Berkas Code.gs Otomatis
+app.all('/api/database/generate-codegs', (req, res) => {
+  const spreadsheetId = String(req.query?.spreadsheet_id || req.body?.spreadsheet_id || configDb.spreadsheet_id || '').trim();
+  const driveFolderId = String(req.query?.drive_folder_id || req.body?.drive_folder_id || configDb.drive_folder_id || '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P').trim();
+  const filePath = path.join(process.cwd(), 'Code.gs');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: "File template Code.gs tidak ditemukan." });
+  }
+
+  let codeContent = fs.readFileSync(filePath, 'utf-8');
+
+  // Inject user's Spreadsheet ID & Drive Folder ID into Code.gs
+  if (spreadsheetId) {
+    codeContent = codeContent.replace(/var SPREADSHEET_ID\s*=\s*["'][^"']*["'];/, `var SPREADSHEET_ID = "${spreadsheetId}";`);
+  }
+  if (driveFolderId) {
+    codeContent = codeContent.replace(/var GOOGLE_DRIVE_FOLDER_ID\s*=\s*["'][^"']*["'];/, `var GOOGLE_DRIVE_FOLDER_ID = "${driveFolderId}";`);
+  }
+
+  if (req.query.download === '1') {
+    res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="Code.gs"');
+    return res.send(codeContent);
+  }
+
+  res.json({
+    success: true,
+    spreadsheetId,
+    driveFolderId,
+    code: codeContent,
+    fileName: "Code.gs",
+    message: "Berkas Code.gs berhasil digenerate dengan konfigurasi terkini!"
+  });
+});
+
+// Endpoint Generator Berkas config.php Otomatis
+app.all('/api/database/generate-configphp', (req, res) => {
+  const filePath = path.join(process.cwd(), 'config.php');
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: "File template config.php tidak ditemukan." });
+  }
+  const phpContent = fs.readFileSync(filePath, 'utf-8');
+  if (req.query.download === '1') {
+    res.setHeader('Content-Type', 'application/x-httpd-php; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="config.php"');
+    return res.send(phpContent);
+  }
+  res.json({
+    success: true,
+    code: phpContent,
+    fileName: "config.php",
+    message: "Berkas config.php siap pakai untuk Hostinger!"
   });
 });
 

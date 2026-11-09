@@ -1496,6 +1496,65 @@ switch ($action) {
         ]);
         exit;
 
+    // KONFIGURASI API GAS
+    case 'getGasConfig':
+        $cfg = isset($db['config']) && is_array($db['config']) ? $db['config'] : [];
+        echo json_encode([
+            'success' => true,
+            'config' => [
+                'gas_webapp_url' => $cfg['gas_webapp_url'] ?? '',
+                'spreadsheet_id' => $cfg['spreadsheet_id'] ?? '',
+                'drive_folder_id' => $cfg['drive_folder_id'] ?? '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P',
+                'gas_direct_enabled' => !empty($cfg['gas_direct_enabled']),
+                'instansi' => $cfg['instansi'] ?? 'Puskesmas Kepulauan Seribu Selatan'
+            ]
+        ]);
+        exit;
+
+    case 'saveGasConfig':
+        if (!isset($db['config']) || !is_array($db['config'])) {
+            $db['config'] = [];
+        }
+        if (isset($payload['gas_webapp_url'])) $db['config']['gas_webapp_url'] = trim($payload['gas_webapp_url']);
+        if (isset($payload['spreadsheet_id'])) $db['config']['spreadsheet_id'] = trim($payload['spreadsheet_id']);
+        if (isset($payload['drive_folder_id'])) $db['config']['drive_folder_id'] = trim($payload['drive_folder_id']);
+        if (isset($payload['gas_direct_enabled'])) $db['config']['gas_direct_enabled'] = (bool)$payload['gas_direct_enabled'];
+        if (isset($payload['instansi'])) $db['config']['instansi'] = trim($payload['instansi']);
+        saveAppStorage($jsonDbFile, $db);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Pengaturan API GAS berhasil disimpan!',
+            'config' => $db['config']
+        ]);
+        exit;
+
+    // GENERATE CODE.GS
+    case 'generateCodeGs':
+        $ssId = isset($payload['spreadsheet_id']) ? trim($payload['spreadsheet_id']) : ($db['config']['spreadsheet_id'] ?? '');
+        $driveId = isset($payload['drive_folder_id']) ? trim($payload['drive_folder_id']) : ($db['config']['drive_folder_id'] ?? '1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P');
+        $codeGsPath = __DIR__ . '/Code.gs';
+        $code = file_exists($codeGsPath) ? file_get_contents($codeGsPath) : '';
+        if (!empty($ssId)) {
+            $code = preg_replace('/var SPREADSHEET_ID\s*=\s*["\'][^"\']*["\'];/', 'var SPREADSHEET_ID = "' . addslashes($ssId) . '";', $code);
+        }
+        if (!empty($driveId)) {
+            $code = preg_replace('/var GOOGLE_DRIVE_FOLDER_ID\s*=\s*["\'][^"\']*["\'];/', 'var GOOGLE_DRIVE_FOLDER_ID = "' . addslashes($driveId) . '";', $code);
+        }
+        if (isset($_GET['download']) && $_GET['download'] === '1') {
+            header('Content-Type: text/javascript; charset=utf-8');
+            header('Content-Disposition: attachment; filename="Code.gs"');
+            echo $code;
+            exit;
+        }
+        echo json_encode([
+            'success' => true,
+            'code' => $code,
+            'spreadsheetId' => $ssId,
+            'driveFolderId' => $driveId,
+            'message' => 'File Code.gs berhasil digenerate!'
+        ]);
+        exit;
+
     default:
         echo json_encode(['success' => false, 'message' => 'Action tidak dikenal atau belum diisi.']);
         exit;
