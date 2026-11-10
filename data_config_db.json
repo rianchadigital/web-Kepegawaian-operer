@@ -1,5 +1,11 @@
 {
-  "gas_webapp_url": "",
-  "gas_disabled": true,
+  "gas_webapp_url": "https://script.google.com/macros/s/AKfycbxOcA8No0AViKODhLZyT6WrNCLk3Iu3V5HFZ6jADA0lBiGVQkMcVUvDUaQkecAR58k4/exec",
+  "spreadsheet_id": "1l-8yw7EPHuoNTYNFdwYrKVVvfw0Ot41AUKc1ERc-gz8",
+  "spreadsheet_name": "Simpeg terbaru nop 2026",
+  "drive_folder_id": "1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P",
+  "gas_direct_enabled": true,
+  "gas_disabled": false,
+  "gas_connected": true,
+  "global_database_source": "GAS",
   "instansi": "Puskesmas Kepulauan Seribu Selatan"
 }

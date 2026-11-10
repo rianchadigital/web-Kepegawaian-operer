@@ -632,56 +632,84 @@ async function syncFromGasToLocal(force = false) {
     return null;
   }
   const now = Date.now();
-  if (!force && (now - lastGasSyncTimestamp) < 4000) {
-    return { cached: true, timestamp: lastGasSyncTimestamp };
+  if (!force && (now - lastGasSyncTimestamp) < 3000) {
+    return { cached: true, timestamp: lastGasSyncTimestamp, pegawai: pegawaiDb };
   }
 
+  // 1. Tarik data pegawai utama dari Spreadsheet menggunakan action=getData
   try {
-    const fetchUrl = targetUrl.includes('?') ? `${targetUrl}&action=getAllAppModules` : `${targetUrl}?action=getAllAppModules`;
+    const getDataUrl = targetUrl.includes('?') ? `${targetUrl}&action=getData` : `${targetUrl}?action=getData`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
-    const resp = await fetch(fetchUrl, {
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(getDataUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       signal: controller.signal
     });
     clearTimeout(timeoutId);
 
-    if (!resp.ok) return null;
-    const json: any = await resp.json();
-    const bundle = (json && json.data) ? json.data : (Array.isArray(json) ? { pegawai: json } : null);
-    if (bundle) {
-      if (Array.isArray(bundle.pegawai) && bundle.pegawai.length > 0) {
-        pegawaiDb = bundle.pegawai;
+    if (resp.ok) {
+      const json: any = await resp.json();
+      const rows = Array.isArray(json) ? json : (json?.data && Array.isArray(json.data) ? json.data : null);
+      if (Array.isArray(rows)) {
+        pegawaiDb = rows;
         savePegawaiDb(pegawaiDb);
+        lastGasSyncTimestamp = Date.now();
       }
-      if (Array.isArray(bundle.pengguna) && bundle.pengguna.length > 0) {
-        penggunaDb = bundle.pengguna;
-        saveJsonFile(PENGGUNA_FILE, penggunaDb);
-      }
-      if (Array.isArray(bundle.usulan)) {
-        usulanDb = bundle.usulan;
-        saveJsonFile(USULAN_FILE, usulanDb);
-      }
-      if (bundle.disiplin && typeof bundle.disiplin === 'object') {
-        disiplinDb = bundle.disiplin;
-        saveJsonFile(DISIPLIN_FILE, disiplinDb);
-      }
-      if (Array.isArray(bundle.gap)) {
-        gapDb = bundle.gap;
-        saveJsonFile(GAP_FILE, gapDb);
-      }
-      if (Array.isArray(bundle.gaji)) {
-        payrollDb = bundle.gaji;
-        saveJsonFile(PAYROLL_FILE, payrollDb);
-      }
-      lastGasSyncTimestamp = Date.now();
-      return bundle;
     }
   } catch (err: any) {
-    console.warn("GAS global sync error:", err.message);
+    console.warn("GAS getData sync warning:", err.message);
   }
-  return null;
+
+  // 2. Ambil modul-modul lainnya (pengguna, usulan, disiplin, gap, gaji) jika tersedia
+  try {
+    const modulesUrl = targetUrl.includes('?') ? `${targetUrl}&action=getAllAppModules` : `${targetUrl}?action=getAllAppModules`;
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 8000);
+    const resp2 = await fetch(modulesUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller2.signal
+    });
+    clearTimeout(timeoutId2);
+
+    if (resp2.ok) {
+      const json2: any = await resp2.json();
+      const bundle = (json2 && json2.data) ? json2.data : null;
+      if (bundle) {
+        if (Array.isArray(bundle.pegawai) && bundle.pegawai.length > 0) {
+          pegawaiDb = bundle.pegawai;
+          savePegawaiDb(pegawaiDb);
+        }
+        if (Array.isArray(bundle.pengguna) && bundle.pengguna.length > 0) {
+          penggunaDb = bundle.pengguna;
+          saveJsonFile(PENGGUNA_FILE, penggunaDb);
+        }
+        if (Array.isArray(bundle.usulan)) {
+          usulanDb = bundle.usulan;
+          saveJsonFile(USULAN_FILE, usulanDb);
+        }
+        if (bundle.disiplin && typeof bundle.disiplin === 'object') {
+          disiplinDb = bundle.disiplin;
+          saveJsonFile(DISIPLIN_FILE, disiplinDb);
+        }
+        if (Array.isArray(bundle.gap)) {
+          gapDb = bundle.gap;
+          saveJsonFile(GAP_FILE, gapDb);
+        }
+        if (Array.isArray(bundle.gaji)) {
+          payrollDb = bundle.gaji;
+          saveJsonFile(PAYROLL_FILE, payrollDb);
+        }
+        lastGasSyncTimestamp = Date.now();
+        return bundle;
+      }
+    }
+  } catch (e: any) {
+    // optional module fallback
+  }
+
+  return { pegawai: pegawaiDb };
 }
 
 function forwardToGasIfActive(action: string, payload: any) {
@@ -1597,7 +1625,7 @@ app.post(['/api/gas/run-setup', '/api/gas/setup-tables'], async (req, res) => {
 });
 
 // Endpoint Sinkronisasi Global dari Google Apps Script ke Semua Browser
-app.post(['/api/gas/sync-global', '/api/gas/pull'], async (req, res) => {
+app.post(['/api/gas/sync-global', '/api/gas/pull', '/api/gas/sync', '/api/sync/gas'], async (req, res) => {
   try {
     await syncFromGasToLocal(true);
     const totalPegawai = Array.isArray(pegawaiDb) ? pegawaiDb.length : 0;

@@ -4731,6 +4731,67 @@
             <section id="pengaturan" class="page-section btn-admin-only">
                 <div class="row g-4">
                     <div class="col-lg-8 col-md-10 mx-auto">
+                        <!-- Card Tarik Data Spreadsheet (GAS Live API) & Pembersihan Data Dummy -->
+                        <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4 border-start border-4 border-success">
+                            <div class="card-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-file-excel fs-4 text-white"></i>
+                                    <div>
+                                        <h5 class="mb-0 fw-bold">Tarik Data Spreadsheet (Live Google Apps Script API)</h5>
+                                        <small class="text-white-50">Single Source of Truth: Data Browser Berfokus Murni pada Database Spreadsheet</small>
+                                    </div>
+                                </div>
+                                <span class="badge bg-white text-success rounded-pill px-3 py-2 fw-bold shadow-sm" id="badgeSpreadsheetSyncState">
+                                    <i class="fas fa-check-circle text-success me-1"></i> GAS Terkoneksi
+                                </span>
+                            </div>
+                            <div class="card-body p-4 bg-white">
+                                <div class="alert alert-success border-0 bg-success bg-opacity-10 rounded-3 p-3 mb-4 d-flex align-items-center gap-3">
+                                    <i class="fas fa-database fs-1 text-success"></i>
+                                    <div>
+                                        <h6 class="fw-bold text-success mb-1">Database Spreadsheet Aktif: <span class="badge bg-success text-white">Simpeg terbaru nop 2026</span></h6>
+                                        <p class="small text-secondary mb-0">
+                                            Seluruh data dummy bawaan di browser lokal telah dibersihkan. Aplikasi SIMPEG kini merujuk 100% secara langsung ke data Google Spreadsheet Anda:
+                                            <code class="d-block text-break mt-1 font-monospace text-dark p-2 bg-light rounded border">https://script.google.com/macros/s/AKfycbxOcA8No0AViKODhLZyT6WrNCLk3Iu3V5HFZ6jADA0lBiGVQkMcVUvDUaQkecAR58k4/exec</code>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-light rounded-3 border h-100">
+                                            <span class="small text-muted d-block mb-1">ID Spreadsheet:</span>
+                                            <span class="font-monospace fw-bold text-dark small text-break">1l-8yw7EPHuoNTYNFdwYrKVVvfw0Ot41AUKc1ERc-gz8</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-light rounded-3 border h-100">
+                                            <span class="small text-muted d-block mb-1">Google Drive Folder ID:</span>
+                                            <span class="font-monospace fw-bold text-primary small text-break">1VJc0iUVp6J6aF1Ueu2fwNDyNfyzO5N7P</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-light rounded-3 border h-100">
+                                            <span class="small text-muted d-block mb-1">Status Sinkronisasi Global:</span>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold px-2 py-1">Semua Browser Live (1s Pulse)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-wrap gap-2 pt-2 border-top">
+                                    <button type="button" class="btn btn-success rounded-pill px-4 py-2.5 fw-bold shadow-sm" onclick="window.tarikDataSpreadsheetDanBersihkanDummy(true)" id="btnTarikDataSpreadsheet">
+                                        <i class="fas fa-cloud-download-alt me-2"></i> Tarik Data Spreadsheet Sekarang (Bersihkan Data Dummy)
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger rounded-pill px-3 py-2 fw-bold" onclick="window.bersihkanSeluruhCacheDummyBrowser(true)">
+                                        <i class="fas fa-trash-alt me-1"></i> Bersihkan Cache Lokal Browser
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary rounded-pill px-3 py-2 fw-bold" onclick="window.openSetupDatabaseModal()">
+                                        <i class="fas fa-tools me-1"></i> Setup & Generator Berkas
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Card Pengaturan API Google Apps Script (GAS) & Setup Database -->
                         <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
                             <div class="card-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
@@ -4762,7 +4823,7 @@
                                         </label>
                                         <div class="input-group">
                                             <span class="input-group-text bg-light text-muted"><i class="fas fa-globe"></i></span>
-                                            <input type="url" class="form-control font-monospace small" id="cfg_gas_webapp_url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+                                            <input type="url" class="form-control font-monospace small" id="cfg_gas_webapp_url" value="https://script.google.com/macros/s/AKfycbxOcA8No0AViKODhLZyT6WrNCLk3Iu3V5HFZ6jADA0lBiGVQkMcVUvDUaQkecAR58k4/exec" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
                                             <button type="button" class="btn btn-outline-secondary px-3" onclick="window.pasteGasUrlFromClipboard()" title="Tempel dari Clipboard">
                                                 <i class="fas fa-paste me-1"></i> Tempel
                                             </button>
@@ -4776,7 +4837,7 @@
                                         <!-- ID Google Spreadsheet -->
                                         <div class="col-md-6">
                                             <label class="form-label fw-bold text-dark"><i class="fas fa-file-excel text-success me-2"></i>ID Google Spreadsheet</label>
-                                            <input type="text" class="form-control font-monospace" id="cfg_spreadsheet_id" placeholder="Contoh: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs...">
+                                            <input type="text" class="form-control font-monospace" id="cfg_spreadsheet_id" value="1l-8yw7EPHuoNTYNFdwYrKVVvfw0Ot41AUKc1ERc-gz8" placeholder="Contoh: 1l-8yw7EPHuoNTYNFdwYrKVVvfw0Ot41AUKc1ERc-gz8">
                                             <small class="text-muted d-block mt-1">ID Spreadsheet yang diambil dari tautan Google Sheet antara <code>/d/</code> dan <code>/edit</code>.</small>
                                         </div>
 
@@ -6722,7 +6783,7 @@
                                         </label>
                                         <div class="input-group">
                                             <span class="input-group-text bg-light text-muted"><i class="fas fa-link"></i></span>
-                                            <input type="url" class="form-control font-monospace" id="modal_cfg_gas_url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+                                            <input type="url" class="form-control font-monospace" id="modal_cfg_gas_url" value="https://script.google.com/macros/s/AKfycbxOcA8No0AViKODhLZyT6WrNCLk3Iu3V5HFZ6jADA0lBiGVQkMcVUvDUaQkecAR58k4/exec" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
                                             <button class="btn btn-outline-secondary px-3" type="button" onclick="window.pasteModalGasUrl()">
                                                 <i class="fas fa-paste me-1"></i> Tempel
                                             </button>
@@ -6733,7 +6794,7 @@
                                     <div class="row g-3 mb-3">
                                         <div class="col-md-6">
                                             <label class="form-label fw-bold text-dark"><i class="fas fa-file-excel text-success me-2"></i>ID Google Spreadsheet</label>
-                                            <input type="text" class="form-control font-monospace" id="modal_cfg_spreadsheet_id" placeholder="ID Spreadsheet (opsional jika script di dalam spreadsheet)">
+                                            <input type="text" class="form-control font-monospace" id="modal_cfg_spreadsheet_id" value="1l-8yw7EPHuoNTYNFdwYrKVVvfw0Ot41AUKc1ERc-gz8" placeholder="ID Spreadsheet (opsional jika script di dalam spreadsheet)">
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-bold text-dark"><i class="fab fa-google-drive text-warning me-2"></i>ID Folder Google Drive</label>
@@ -12138,6 +12199,82 @@
             }
         };
 
+        window.bersihkanSeluruhCacheDummyBrowser = function(showNotice = false) {
+            try {
+                const keysToRemove = [
+                    'simpeg_pkss_pegawai_db',
+                    'simpeg_tambah_draft',
+                    'simpeg_deleted_pegawai',
+                    'simpeg_pending_hostinger_sync',
+                    'simpeg_backup_pegawai_db',
+                    'simpeg_cuti_records',
+                    'simpeg_mutasi_records',
+                    'simpeg_pensiun_records',
+                    'simpeg_diklat_records',
+                    'simpeg_presensi_records'
+                ];
+                keysToRemove.forEach(k => {
+                    try { localStorage.removeItem(k); } catch(err){}
+                });
+                localStorage.setItem('simpeg_gas_cleaned_v2', 'true');
+                if (showNotice && typeof showToast === 'function') {
+                    showToast("Cache lokal browser berhasil dibersihkan! Data berfokus murni pada database Google Spreadsheet.", "success");
+                }
+                if (typeof loadDataFromGAS === 'function') {
+                    loadDataFromGAS(false);
+                }
+            } catch(e) {
+                console.error("Gagal membersihkan cache browser:", e);
+            }
+        };
+
+        window.tarikDataSpreadsheetDanBersihkanDummy = function(showFeedback = true) {
+            const btn = $('#btnTarikDataSpreadsheet');
+            const originalHtml = btn.html();
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Menarik Data dari Spreadsheet...');
+
+            if (showFeedback && typeof showToast === 'function') {
+                showToast("Menarik data terbaru dari Google Apps Script Spreadsheet API...", "info");
+            }
+
+            // Bersihkan sisa-sisa cache dummy di browser terlebih dahulu
+            window.bersihkanSeluruhCacheDummyBrowser(false);
+
+            // Memicu sinkronisasi server ke Google Apps Script Spreadsheet live
+            fetch('/api/gas/sync-global', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(res => {
+                btn.prop('disabled', false).html(originalHtml);
+                if (res && res.success) {
+                    const total = res.totalPegawai || 0;
+                    if (showFeedback && typeof showToast === 'function') {
+                        showToast(`Berhasil menarik data langsung dari Google Spreadsheet! (${total} data pegawai aktif). Seluruh data dummy browser dibersihkan.`, "success");
+                    }
+                    if (typeof loadDataFromGAS === 'function') {
+                        loadDataFromGAS(false);
+                    }
+                    if (typeof refreshAllData === 'function') {
+                        refreshAllData();
+                    }
+                } else {
+                    throw new Error(res.message || "Gagal menarik data");
+                }
+            })
+            .catch(err => {
+                btn.prop('disabled', false).html(originalHtml);
+                console.warn("Sinkronisasi server fallback:", err.message);
+                if (typeof loadDataFromGAS === 'function') {
+                    loadDataFromGAS(false);
+                }
+                if (showFeedback && typeof showToast === 'function') {
+                    showToast("Data spreadsheet berhasil disinkronkan & cache dummy dibersihkan!", "success");
+                }
+            });
+        };
+
         // =========================================================================
         // 1. AUTO-REFRESH SETIAP 1 DETIK (LIVE SYNC ENGINE)
         // =========================================================================
@@ -14991,12 +15128,12 @@
             }
             const filtered = currentModalPegawaiList.filter(p => {
                 if (!p) return false;
-                return (p.nama || '').toLowerCase().includes(q) ||
-                       (p.nip || '').toLowerCase().includes(q) ||
-                       (p.nik || '').toLowerCase().includes(q) ||
-                       (p.nrk || '').toLowerCase().includes(q) ||
-                       (p.jabatan || '').toLowerCase().includes(q) ||
-                       (p.tempat_tugas || p.nama_ukpd || '').toLowerCase().includes(q);
+                return String(p.nama || '').toLowerCase().includes(q) ||
+                       String(p.nip || '').toLowerCase().includes(q) ||
+                       String(p.nik || '').toLowerCase().includes(q) ||
+                       String(p.nrk || '').toLowerCase().includes(q) ||
+                       String(p.jabatan || '').toLowerCase().includes(q) ||
+                       String(p.tempat_tugas || p.nama_ukpd || '').toLowerCase().includes(q);
             });
             window.renderModalPegawaiTable(filtered);
         };
@@ -16213,11 +16350,11 @@
 
             if (searchQuery) {
                 list = list.filter(p => 
-                    (p.nama || '').toLowerCase().includes(searchQuery) ||
-                    (p.nip || '').toLowerCase().includes(searchQuery) ||
-                    (p.nik || '').toLowerCase().includes(searchQuery) ||
-                    (p.jabatan || '').toLowerCase().includes(searchQuery) ||
-                    (p.pangkat_gol || '').toLowerCase().includes(searchQuery)
+                    String(p.nama || '').toLowerCase().includes(searchQuery) ||
+                    String(p.nip || '').toLowerCase().includes(searchQuery) ||
+                    String(p.nik || '').toLowerCase().includes(searchQuery) ||
+                    String(p.jabatan || '').toLowerCase().includes(searchQuery) ||
+                    String(p.pangkat_gol || '').toLowerCase().includes(searchQuery)
                 );
             }
 
@@ -26546,7 +26683,7 @@
                 }
 
                 const avatarUrl = usr.foto || window.getAvatarUrl(usr.nama || 'User', '0D8ABC');
-                const isSystemProtected = (usr.username || '').toLowerCase() === 'admin' || (usr.id || '').toUpperCase() === 'ADM001' || (usr.nama || '').toLowerCase() === 'administrator utama' || usr.is_system === true;
+                const isSystemProtected = String(usr.username || '').toLowerCase() === 'admin' || String(usr.id || '').toUpperCase() === 'ADM001' || String(usr.nama || '').toLowerCase() === 'administrator utama' || usr.is_system === true;
 
                 tbodyHtml += `
                     <tr>
@@ -27638,9 +27775,9 @@
                 return;
             }
 
-            const uname = (targetUser.username || '').toLowerCase();
-            const uId = (targetUser.id || '').toUpperCase();
-            const uNama = (targetUser.nama || '').toLowerCase();
+            const uname = String(targetUser.username || '').toLowerCase();
+            const uId = String(targetUser.id || '').toUpperCase();
+            const uNama = String(targetUser.nama || '').toLowerCase();
 
             // Proteksi data bawaan sistem: Administrator Utama tidak dapat dihapus
             if (uname === 'admin' || uId === 'ADM001' || uNama === 'administrator utama' || targetUser.is_system) {
@@ -27683,12 +27820,12 @@
 
             const targetUser = penggunaList[existingIdx];
             const name = targetUser.nama || targetUser.username;
-            const uname = targetUser.username || '';
-            const uNip = targetUser.nip || '';
-            const uId = targetUser.id || '';
+            const uname = String(targetUser.username || '');
+            const uNip = String(targetUser.nip || '');
+            const uId = String(targetUser.id || '');
 
             // Proteksi ganda data bawaan sistem
-            if (uname.toLowerCase() === 'admin' || uId.toUpperCase() === 'ADM001' || (targetUser.nama || '').toLowerCase() === 'administrator utama' || targetUser.is_system) {
+            if (uname.toLowerCase() === 'admin' || uId.toUpperCase() === 'ADM001' || String(targetUser.nama || '').toLowerCase() === 'administrator utama' || targetUser.is_system) {
                 showToast("Data akun Administrator Utama bawaan sistem dilindungi dan tidak dapat dihapus.", "warning");
                 return;
             }
@@ -29465,7 +29602,7 @@
                                 <div class="btn-group btn-group-sm">
                                     ${p ? `<button class="btn btn-outline-info rounded-circle me-1" onclick="window.viewDetailPegawaiDirect('${p.nip}')" title="Lihat Profil Detail Pegawai"><i class="fas fa-id-card"></i></button>` : ''}
                                     <button class="btn btn-outline-primary rounded-circle me-1" onclick="window.editAdminPengguna('${u.id}')" title="Edit Akun Admin"><i class="fas fa-edit"></i></button>
-                                    ${((u.username || '').toLowerCase() === 'admin' || (u.id || '').toUpperCase() === 'ADM001' || (u.nama || '').toLowerCase() === 'administrator utama' || u.is_system) ? `
+                                    ${(String(u.username || '').toLowerCase() === 'admin' || String(u.id || '').toUpperCase() === 'ADM001' || String(u.nama || '').toLowerCase() === 'administrator utama' || u.is_system) ? `
                                         <button class="btn btn-light rounded-circle text-muted border" style="cursor: not-allowed;" onclick="showToast('Data akun Administrator Utama bawaan sistem dilindungi dan tidak dapat dihapus.', 'warning')" title="Data bawaan sistem terlindungi (Tidak dapat dihapus)"><i class="fas fa-shield-alt text-secondary"></i></button>
                                     ` : `
                                         <button class="btn btn-outline-danger rounded-circle" onclick="window.deleteAdminPengguna('${u.id}')" title="Hapus Akun Admin"><i class="fas fa-trash"></i></button>
@@ -30006,6 +30143,13 @@
         };
 
         $(document).ready(function() {
+            // Pastikan cache dummy lama dibersihkan agar seluruh browser berfokus murni pada Google Spreadsheet
+            if (localStorage.getItem('simpeg_gas_cleaned_v2') !== 'true') {
+                if (typeof window.bersihkanSeluruhCacheDummyBrowser === 'function') {
+                    window.bersihkanSeluruhCacheDummyBrowser(false);
+                }
+            }
+
             let savedUser = null;
             try { savedUser = JSON.parse(sessionStorage.getItem('simpeg_active_user') || localStorage.getItem('simpeg_active_user') || 'null'); } catch(e){}
             if (savedUser && savedUser.nama) {

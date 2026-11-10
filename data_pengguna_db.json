@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "password": 123456,
+    "nama": "Super Administrator SIMPEG",
+    "nip": "198501012010011001",
+    "email": "admin.pkss@jakarta.go.id",
+    "role": "Super Admin",
+    "status": "Aktif",
+    "permissions": "all",
+    "last_login": "2026-11-09"
+  },
+  {
+    "id": 2,
+    "username": "kepegawaian",
+    "password": 123456,
+    "nama": "Admin Kepegawaian PKSS",
+    "nip": "198805152015031002",
+    "email": "kepegawaian.pkss@jakarta.go.id",
+    "role": "Admin Kepegawaian",
+    "status": "Aktif",
+    "permissions": "kepegawaian",
+    "last_login": "2026-11-09"
+  },
+  {
+    "id": 3,
+    "username": "operator_pustu",
+    "password": 123456,
+    "nama": "Operator Pustu Pulau Tidung",
+    "nip": "199408202022032008",
+    "email": "pustu.tidung@jakarta.go.id",
+    "role": "Operator Unit",
+    "status": "Aktif",
+    "permissions": "operator",
+    "last_login": "2026-11-09"
+  }
+]
